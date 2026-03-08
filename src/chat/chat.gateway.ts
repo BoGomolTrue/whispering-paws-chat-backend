@@ -137,7 +137,9 @@ export class ChatGateway {
     if (!user || !user.roomId || data?.msgId == null) return;
     if (user.role !== "admin") return;
     await this.dbService.deleteChatMessage(data.msgId);
-    this.server.to(`room:${user.roomId}`).emit("chat:deleted", { msgId: data.msgId });
+    this.server
+      .to(`room:${user.roomId}`)
+      .emit("chat:deleted", { msgId: data.msgId });
   }
 
   @SubscribeMessage("chat:clear")
