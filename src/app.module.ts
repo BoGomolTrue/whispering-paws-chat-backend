@@ -4,8 +4,7 @@ import { AiModule } from "./ai/ai.module";
 import { AuthModule } from "./auth/auth.module";
 import { BotsModule } from "./bots/bots.module";
 import { ChatModule } from "./chat/chat.module";
-import { OnlineUsersService } from "./common/services/online-users.service";
-import { RateLimitService } from "./common/services/rate-limit.service";
+import { CommonModule } from "./common/common.module";
 import { DailyModule } from "./daily/daily.module";
 import { DatabaseModule } from "./database/database.module";
 import { FilesModule } from "./files/files.module";
@@ -20,6 +19,7 @@ import { UsersModule } from "./users/users.module";
       isGlobal: true,
       envFilePath: ".env",
     }),
+    CommonModule,
     DatabaseModule,
     AuthModule,
     UsersModule,
@@ -32,6 +32,5 @@ import { UsersModule } from "./users/users.module";
     AiModule,
     FilesModule,
   ],
-  providers: [OnlineUsersService, RateLimitService],
 })
 export class AppModule {}

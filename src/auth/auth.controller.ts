@@ -91,7 +91,6 @@ export class AuthController {
   @Post("login")
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Res() res: Response) {
-    console.log("TEST DATA", "qwe");
     const user = await this.dbService.findUserByEmail(dto.email);
     if (!user) throw new BadRequestException("Invalid email or password");
     const u = user.get({ plain: true }) as {

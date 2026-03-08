@@ -28,6 +28,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private onlineUsersService: OnlineUsersService,
     private shopService: ShopService,
     private paymentService: PaymentService,
+    private wsJwtGuard: WsJwtGuard,
   ) {}
 
   private buildEquippedDefaults(): Record<string, string | null> {
@@ -47,69 +48,95 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleConnection(client: Socket) {
-    const raw = client.data.user;
-    if (!raw) return;
-
-    const isGuest = !!raw.guest;
-    const baseRoomId = isGuest
-      ? await this.dbService.getGuestRoomId()
-      : await this.dbService.getDefaultRoomId();
-    let startRoomId = baseRoomId;
-
-    if (!isGuest && raw.lastRoomId) {
-      const savedRoom = await this.dbService.getRoomById(raw.lastRoomId);
-      if (savedRoom && savedRoom.name !== "Guest Room") {
-        startRoomId = savedRoom.id;
-      }
-    }
-
-    const equipped = this.buildEquippedDefaults();
-    const equippedColors = this.buildEquippedDefaults();
-    if (raw.equipped) {
-      for (const [k, v] of Object.entries(raw.equipped)) {
-        if (v && equipped[k] !== undefined) {
-          equipped[k] = v as string;
-          equippedColors[k] =
-            (raw.equippedColors as Record<string, string | null>)?.[k] ?? null;
+    try {
+      let raw = client.data.user;
+      if (!raw) {
+        try {
+          await this.wsJwtGuard.authenticateConnection(client);
+          raw = client.data.user;
+        } catch (e) {
+          this.logger.warn(`handleConnection: auth failed for ${client.id}`, e);
+          client.emit("connect_error", new Error("AUTH_REQUIRED"));
+          client.disconnect(true);
+          return;
         }
       }
+      if (!raw) return;
+
+      const isGuest = !!raw.guest;
+      this.logger.log(`handleConnection: ${client.id} guest=${isGuest}`);
+      const baseRoomId = isGuest
+        ? await this.dbService.getGuestRoomId()
+        : await this.dbService.getDefaultRoomId();
+      let startRoomId = baseRoomId;
+
+      if (!isGuest && raw.lastRoomId) {
+        const savedRoom = await this.dbService.getRoomById(raw.lastRoomId);
+        if (savedRoom && savedRoom.name !== "Guest Room") {
+          startRoomId = savedRoom.id;
+        }
+      }
+
+      const equipped = this.buildEquippedDefaults();
+      const equippedColors = this.buildEquippedDefaults();
+      if (raw.equipped) {
+        for (const [k, v] of Object.entries(raw.equipped)) {
+          if (v && equipped[k] !== undefined) {
+            equipped[k] = v as string;
+            equippedColors[k] =
+              (raw.equippedColors as Record<string, string | null>)?.[k] ??
+              null;
+          }
+        }
+      }
+
+      const onlineUser = {
+        id: raw.id ?? raw.userId ?? raw.guestId,
+        socketId: client.id,
+        nickname: raw.nickname,
+        roomId: startRoomId,
+        x: 200 + Math.random() * 600,
+        y: 0,
+        emotion: "neutral",
+        coins: raw.coins ?? 0,
+        ownedItems: raw.ownedItems ?? [],
+        equipped: raw.equipped ?? equipped,
+        equippedColors: raw.equippedColors ?? equippedColors,
+        characterType: raw.characterType ?? "cat",
+        gender: raw.gender ?? "male",
+        eyeColor: raw.eyeColor ?? "#ff0000",
+        status: raw.status ?? null,
+        role: raw.role ?? "user",
+        lastSalaryAt: raw.lastSalaryAt ?? 0,
+        salaryClaimCount: raw.salaryClaimCount ?? 0,
+        inventoryValue: this.shopService.calcInventoryValue(
+          raw.ownedItems ?? [],
+        ),
+        notificationsOff: raw.notificationsOff,
+        animationsOff: raw.animationsOff,
+        invisible: raw.invisible,
+        isGuest: isGuest || undefined,
+        anketa_about: raw.anketa_about,
+        anketa_city: raw.anketa_city,
+        anketa_interests: raw.anketa_interests,
+        anketa_looking_for: raw.anketa_looking_for,
+        anketa_age: raw.anketa_age,
+        anketa_avatar: raw.anketa_avatar,
+      };
+
+      this.onlineUsersService.add(client.id, onlineUser as any);
+      this.logger.log(
+        `Client connected: ${client.id} (${onlineUser.nickname}), joining room ${startRoomId}`,
+      );
+      await this.joinRoom(client, onlineUser as any, startRoomId);
+      this.logger.log(`room:joined emitted to ${client.id}`);
+    } catch (err) {
+      this.logger.error(`handleConnection error for ${client.id}`, err);
+      client.emit(
+        "room:error",
+        err instanceof Error ? err.message : "Connection failed",
+      );
     }
-
-    const onlineUser = {
-      id: raw.id ?? raw.userId ?? raw.guestId,
-      socketId: client.id,
-      nickname: raw.nickname,
-      roomId: startRoomId,
-      x: 200 + Math.random() * 600,
-      y: 0,
-      emotion: "neutral",
-      coins: raw.coins ?? 0,
-      ownedItems: raw.ownedItems ?? [],
-      equipped: raw.equipped ?? equipped,
-      equippedColors: raw.equippedColors ?? equippedColors,
-      characterType: raw.characterType ?? "cat",
-      gender: raw.gender ?? "male",
-      eyeColor: raw.eyeColor ?? "#ff0000",
-      status: raw.status ?? null,
-      role: raw.role ?? "user",
-      lastSalaryAt: raw.lastSalaryAt ?? 0,
-      salaryClaimCount: raw.salaryClaimCount ?? 0,
-      inventoryValue: this.shopService.calcInventoryValue(raw.ownedItems ?? []),
-      notificationsOff: raw.notificationsOff,
-      animationsOff: raw.animationsOff,
-      invisible: raw.invisible,
-      isGuest: isGuest || undefined,
-      anketa_about: raw.anketa_about,
-      anketa_city: raw.anketa_city,
-      anketa_interests: raw.anketa_interests,
-      anketa_looking_for: raw.anketa_looking_for,
-      anketa_age: raw.anketa_age,
-      anketa_avatar: raw.anketa_avatar,
-    };
-
-    this.onlineUsersService.add(client.id, onlineUser as any);
-    this.logger.log(`Client connected: ${client.id} (${onlineUser.nickname})`);
-    await this.joinRoom(client, onlineUser as any, startRoomId);
   }
 
   handleDisconnect(client: Socket) {
@@ -198,11 +225,148 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     void this.joinRoom(client, user, room.id);
   }
 
+  @SubscribeMessage("room:leave")
+  async handleRoomLeave(@ConnectedSocket() client: Socket) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user) return;
+    const baseRoomId = user.isGuest
+      ? await this.dbService.getGuestRoomId()
+      : await this.dbService.getDefaultRoomId();
+    void this.joinRoom(client, user, baseRoomId);
+  }
+
+  @SubscribeMessage("room:delete")
+  async handleRoomDelete(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId?: number },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || !data.roomId) return;
+    const room = await this.dbService.getRoomById(data.roomId);
+    if (!room || room.creatorId !== user.id) return;
+    await this.dbService.deleteRoom(data.roomId);
+    this.server.emit("room:deleted", { roomId: data.roomId });
+    if (user.roomId === data.roomId) {
+      const defaultRoomId = await this.dbService.getDefaultRoomId();
+      void this.joinRoom(client, user, defaultRoomId);
+    }
+  }
+
+  @SubscribeMessage("move")
+  handleMove(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { x?: number; y?: number },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || !user.roomId || data?.x == null || data?.y == null) return;
+    user.x = data.x;
+    user.y = data.y;
+    client.to(`room:${user.roomId}`).emit("user:move", {
+      socketId: client.id,
+      x: data.x,
+      y: data.y,
+    });
+  }
+
+  @SubscribeMessage("emotion")
+  handleEmotion(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() emotion: string,
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || !user.roomId || typeof emotion !== "string") return;
+    user.emotion = emotion;
+    client.to(`room:${user.roomId}`).emit("user:emotion", {
+      socketId: client.id,
+      emotion,
+    });
+  }
+
+  @SubscribeMessage("nickname:change")
+  async handleNicknameChange(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { name?: string },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest) return;
+    const name = (data?.name ?? "").trim().substring(0, 20);
+    if (!name) return;
+    const maxLen = await this.dbService.getSettingNumber(
+      "max_nickname_length",
+      20,
+    );
+    if (name.length > maxLen) return;
+    const existing = await this.dbService.findUserByNickname(name);
+    if (existing && existing.id !== user.id) {
+      client.emit("room:error", "Nickname taken");
+      return;
+    }
+    await this.dbService.updateNickname(user.id, name);
+    user.nickname = name;
+    client.to(`room:${user.roomId}`).emit("user:nickname", {
+      socketId: client.id,
+      nickname: name,
+    });
+  }
+
   private getSalaryCooldownRemain(user: any): number {
     const base = 5 * 60 * 1000;
     const extra = 30 * 1000;
     const cd = base + (user.salaryClaimCount || 0) * extra;
     return Math.max(0, cd - (Date.now() - (user.lastSalaryAt || 0)));
+  }
+
+  @SubscribeMessage("salary:claim")
+  async handleSalaryClaim(@ConnectedSocket() client: Socket) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest) return;
+    const remain = this.getSalaryCooldownRemain(user);
+    if (remain > 0) {
+      client.emit("salary:wait", { remainMs: remain });
+      return;
+    }
+    const amount = await this.dbService.getSettingNumber("salary_amount", 10);
+    const newCoins = user.coins + amount;
+    await this.dbService.updateUserCoins(user.id, newCoins);
+    const newCount = (user.salaryClaimCount || 0) + 1;
+    await this.dbService.updateSalary(user.id, Date.now(), newCount);
+    user.coins = newCoins;
+    user.lastSalaryAt = Date.now();
+    user.salaryClaimCount = newCount;
+    const nextCd = 5 * 60 * 1000 + newCount * 30 * 1000;
+    client.emit("salary:claimed", { coins: newCoins, nextCooldownMs: nextCd });
+  }
+
+  @SubscribeMessage("user:ban")
+  async handleBan(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userId?: number },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.role !== "admin" || !data?.userId) return;
+    await this.dbService.banUser(data.userId);
+    const target = this.onlineUsersService.getById(data.userId);
+    if (target && this.server) {
+      const sock = this.server.sockets.sockets.get(target.socketId);
+      if (sock) {
+        sock.emit("force:banned", null);
+        sock.disconnect(true);
+      }
+    }
+  }
+
+  @SubscribeMessage("user:toggleInvisible")
+  async handleToggleInvisible(@ConnectedSocket() client: Socket) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest) return;
+    const next = !user.invisible;
+    await this.dbService.setInvisible(user.id, next);
+    user.invisible = next;
+    client.emit("user:invisibleChanged", { invisible: next });
+    if (user.roomId) {
+      client.to(`room:${user.roomId}`).emit("user:leave", client.id);
+      client.to(`room:${user.roomId}`).emit("user:join", user);
+    }
   }
 
   private async joinRoom(client: Socket, user: any, roomId: number) {

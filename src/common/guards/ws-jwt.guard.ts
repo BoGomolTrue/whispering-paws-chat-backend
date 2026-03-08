@@ -10,6 +10,30 @@ export class WsJwtGuard implements CanActivate {
     private dbService: DatabaseService,
   ) {}
 
+  async authenticateConnection(client: Socket): Promise<void> {
+    const token = this.extractToken(client);
+    if (!token) throw new Error("AUTH_REQUIRED");
+    const payload = this.authService.verifyToken(token);
+    if (!payload) throw new Error("AUTH_REQUIRED");
+    if (
+      payload.guest &&
+      payload.guestId != null &&
+      payload.nickname &&
+      payload.characterType
+    ) {
+      client.data.user = payload;
+      client.data.isGuest = true;
+      return;
+    }
+    if (!payload.userId) throw new Error("AUTH_REQUIRED");
+    const userData = await this.dbService.loadUserForSocket(payload.userId);
+    if (!userData || userData.banned) {
+      throw new Error(userData?.banned ? "BANNED" : "AUTH_REQUIRED");
+    }
+    client.data.user = { userId: payload.userId, ...userData };
+    client.data.isGuest = false;
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client: Socket = context.switchToWs().getClient();
     const token = this.extractToken(client);
@@ -23,30 +47,7 @@ export class WsJwtGuard implements CanActivate {
       throw new Error("AUTH_REQUIRED");
     }
 
-    // Guest user logic
-    if (
-      payload.guest &&
-      payload.guestId != null &&
-      payload.nickname &&
-      payload.characterType
-    ) {
-      client.data.user = payload;
-      client.data.isGuest = true;
-      return true;
-    }
-
-    // Regular user logic
-    if (!payload.userId) {
-      throw new Error("AUTH_REQUIRED");
-    }
-
-    const userData = await this.dbService.loadUserForSocket(payload.userId);
-    if (!userData || userData.banned) {
-      throw new Error(userData?.banned ? "BANNED" : "AUTH_REQUIRED");
-    }
-
-    client.data.user = { userId: payload.userId, ...userData };
-    client.data.isGuest = false;
+    await this.authenticateConnection(client);
     return true;
   }
 

@@ -183,6 +183,48 @@ export class PaymentService {
     return { url: tgData.result };
   }
 
+  async processTgRefund(
+    telegramId: string,
+    chargeId: string,
+    coins?: number,
+  ): Promise<{ ok: boolean; error?: string }> {
+    const TG_BOT_TOKEN = this.configService.get<string>("TG_BOT_TOKEN");
+    if (!TG_BOT_TOKEN) {
+      return { ok: false, error: "TG_BOT_TOKEN not configured" };
+    }
+    const user = await this.dbService.findUserByTelegramId(telegramId);
+    if (!user) {
+      return { ok: false, error: "User not found by telegramId" };
+    }
+    const tgRes = await fetch(
+      `https://api.telegram.org/bot${TG_BOT_TOKEN}/refundStarPayment`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: telegramId,
+          telegram_payment_charge_id: chargeId,
+        }),
+      },
+    );
+    const tgData = await tgRes.json();
+    if (!tgData.ok) {
+      this.logger.warn(
+        `TG Refund failed: ${tgData.description || "unknown"}, tg_id: ${telegramId}, charge: ${chargeId}`,
+      );
+      return { ok: false, error: tgData.description || "Refund failed" };
+    }
+    if (coins != null && coins > 0) {
+      const newCoins = Math.max(0, user.coins - coins);
+      await this.dbService.updateUserCoins(user.id, newCoins);
+      this.creditCoinsToOnlineUser(user.id, newCoins);
+    }
+    this.logger.log(
+      `TG Refund: user ${user.nickname}, tg_id: ${telegramId}, charge: ${chargeId}, coins: -${coins || 0}`,
+    );
+    return { ok: true };
+  }
+
   async processTgWebhook(update: any): Promise<void> {
     const TG_BOT_TOKEN = this.configService.get<string>("TG_BOT_TOKEN");
 

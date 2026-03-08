@@ -4,8 +4,9 @@ import {
   MessageBody,
   SubscribeMessage,
   WebSocketGateway,
+  WebSocketServer,
 } from "@nestjs/websockets";
-import { Socket } from "socket.io";
+import { Server, Socket } from "socket.io";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
 import { OnlineUsersService } from "../common/services/online-users.service";
 import { VALID_CATEGORIES } from "./shop.data.constant";
@@ -14,6 +15,9 @@ import { ShopService } from "./shop.service";
 @WebSocketGateway()
 @UseGuards(WsJwtGuard)
 export class ShopGateway {
+  @WebSocketServer()
+  server: Server;
+
   private readonly logger = new Logger(ShopGateway.name);
 
   constructor(
@@ -83,6 +87,59 @@ export class ShopGateway {
           equippedColors: user.equippedColors,
         });
       }
+    } catch (e) {
+      client.emit("shop:error", e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  @SubscribeMessage("gift:send")
+  async handleGiftSend(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { toUserId?: number; itemId?: string },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || !data?.toUserId || !data?.itemId) return;
+    if (data.toUserId === user.id) return;
+    const itemId = data.itemId;
+    if (!user.ownedItems.includes(itemId)) {
+      client.emit("shop:error", "Item not owned");
+      return;
+    }
+    const recipient = this.onlineUsersService.getById(data.toUserId);
+    if (!recipient) {
+      client.emit("shop:error", "User not online");
+      return;
+    }
+    const item = this.shopService.getItemFromCache(itemId);
+    if (!item) return;
+    if (recipient.ownedItems.includes(itemId)) {
+      client.emit("shop:error", "User already has this item");
+      return;
+    }
+    try {
+      if (user.equipped[item.category] === itemId) {
+        user.equipped[item.category] = null;
+        user.equippedColors[item.category] = null;
+        await this.shopService.equipItem(user.id, item.category, null, null);
+      }
+      user.ownedItems = user.ownedItems.filter((id) => id !== itemId);
+      user.inventoryValue = this.shopService.calcInventoryValue(user.ownedItems);
+      await this.shopService.transferItem(user.id, data.toUserId, itemId);
+      recipient.ownedItems.push(itemId);
+      recipient.inventoryValue = this.shopService.calcInventoryValue(
+        recipient.ownedItems,
+      );
+      const recipientSock = this.server.sockets.sockets.get(recipient.socketId);
+      if (recipientSock) {
+        recipientSock.emit("gift:received", {
+          fromNickname: user.nickname,
+          itemId,
+          itemName: item.name ?? itemId,
+          ownedItems: recipient.ownedItems,
+          inventoryValue: recipient.inventoryValue,
+        });
+      }
+      client.emit("gift:sent", { toUserId: data.toUserId, itemId });
     } catch (e) {
       client.emit("shop:error", e instanceof Error ? e.message : "Error");
     }

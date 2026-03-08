@@ -113,4 +113,13 @@ export class ShopService {
 
     return { equipped: user.equipped, equippedColors: user.equippedColors };
   }
+
+  async transferItem(
+    fromUserId: number,
+    toUserId: number,
+    itemId: string,
+  ): Promise<void> {
+    await this.dbService.removeOwnedItem(fromUserId, itemId);
+    await this.dbService.addOwnedItem(toUserId, itemId);
+  }
 }
