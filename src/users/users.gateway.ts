@@ -130,6 +130,26 @@ export class UsersGateway {
             avatar: user.anketa_avatar,
           },
         });
+        // Отправляем системное сообщение в чат с ссылкой на анкету
+        const text = `edited_anketa [anketa:${user.id}]`;
+        await this.dbService.saveChatMessage({
+          roomId: user.roomId,
+          userId: null,
+          nickname: user.nickname,
+          text,
+          gender: user.gender,
+          isSystem: true,
+        });
+        client.to(`room:${user.roomId}`).emit("chat:message", {
+          msgId: Date.now(),
+          socketId: "__system__",
+          userId: user.id,
+          nickname: user.nickname,
+          text,
+          timestamp: Date.now(),
+          gender: user.gender,
+          isSystem: true,
+        });
       }
     } catch (err) {
       client.emit(

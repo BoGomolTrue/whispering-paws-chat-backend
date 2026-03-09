@@ -340,7 +340,7 @@ export class DatabaseService implements OnModuleInit {
     });
     return (rows as any[]).reverse().map((r) => ({
       msgId: r.id,
-      socketId: r.isSystem ? "system" : "",
+      socketId: r.isSystem ? "__system__" : "",
       userId: r.userId,
       nickname: r.nickname,
       text: r.text,
