@@ -269,7 +269,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage("emotion")
-  handleEmotion(
+  async handleEmotion(
     @ConnectedSocket() client: Socket,
     @MessageBody() emotion: string,
   ) {
@@ -279,6 +279,34 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.to(`room:${user.roomId}`).emit("user:emotion", {
       socketId: client.id,
       emotion,
+    });
+
+    // Отправляем системное сообщение в чат о смене эмоции
+    const emotionNames: Record<string, string> = {
+      neutral: "спокоен",
+      happy: "радуется",
+      love: "влюблён",
+      laugh: "смеётся",
+      cool: "крут",
+      cry: "грустит",
+      angry: "злится",
+      sleep: "спит",
+    };
+    const emotionText = emotionNames[emotion] || emotion;
+    await this.dbService.saveChatMessage({
+      roomId: user.roomId,
+      userId: null,
+      nickname: "",
+      text: `${user.nickname} ${emotionText}`,
+      gender: user.gender,
+      isSystem: true,
+    });
+    this.server.to(`room:${user.roomId}`).emit("chat:message", {
+      socketId: "__system__",
+      nickname: "",
+      text: `${user.nickname} ${emotionText}`,
+      timestamp: Date.now(),
+      isSystem: true,
     });
   }
 

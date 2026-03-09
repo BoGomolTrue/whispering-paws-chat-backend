@@ -175,11 +175,7 @@ export class UsersGateway {
       return;
     }
     try {
-      await this.usersService.changePassword(
-        user.id,
-        oldPassword,
-        newPassword,
-      );
+      await this.usersService.changePassword(user.id, oldPassword, newPassword);
       client.emit("profile:saved", {});
     } catch (err) {
       client.emit(
