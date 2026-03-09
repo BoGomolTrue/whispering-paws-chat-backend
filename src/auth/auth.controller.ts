@@ -38,7 +38,14 @@ export class AuthController {
 
   @Get("me")
   async me(@Req() req: Request, @Res() res: Response) {
-    const token = req.cookies?.token;
+    // Пробуем получить токен из Authorization header или cookies
+    const authHeader = req.headers.authorization;
+    let token: string | undefined;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else {
+      token = req.cookies?.token;
+    }
     if (!token) {
       return res.status(401).json({ user: null });
     }
@@ -47,14 +54,22 @@ export class AuthController {
       res.cookie("token", "", { httpOnly: true, path: "/", maxAge: 0 });
       return res.status(401).json({ user: null });
     }
+    // Проверяем гостевой токен
     if (
       payload.guest &&
       payload.guestId != null &&
       payload.nickname &&
       payload.characterType
     ) {
-      res.cookie("token", "", { httpOnly: true, path: "/", maxAge: 0 });
-      return res.status(401).json({ user: null });
+      return res.json({
+        user: {
+          id: payload.guestId,
+          nickname: payload.nickname,
+          characterType: payload.characterType,
+          gender: payload.gender,
+          isGuest: true,
+        },
+      });
     }
     if (!payload.userId) {
       return res.status(401).json({ user: null });
