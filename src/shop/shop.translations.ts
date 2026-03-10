@@ -55,7 +55,11 @@ export const SHOP_TRANSLATIONS: ShopTranslations = {
     red_roses: { en: "Red Roses", ru: "Букет роз" },
 
     // Vehicles
-    car: { en: "Sports Car", ru: "Спортивный автомобиль" },
+    mercedes_benz_c: {
+      en: "Mercedes-Benz C-Class",
+      ru: "Mercedes-Benz C-Class",
+    },
+    bmw_3_series: { en: "BMW 3 Series", ru: "BMW 3 Series" },
   },
 };
 

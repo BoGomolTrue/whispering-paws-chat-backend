@@ -17,14 +17,14 @@ import { DatabaseService } from "../database/database.service";
 import { AuthService } from "./auth.service";
 import { GuestLoginDto, LoginDto, RegisterDto } from "./dto/login.dto";
 
-function setTokenCookie(res: Response, token: string) {
+function setTokenCookie(res: Response, token: string, isGuest = false) {
   const isProd = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true,
     sameSite: isProd ? "none" : "lax",
     secure: isProd,
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: isGuest ? undefined : 60 * 60 * 24 * 30,
   });
 }
 
@@ -157,7 +157,7 @@ export class AuthController {
       characterType: dto.characterType,
       gender: dto.gender,
     });
-    setTokenCookie(res, token);
+    setTokenCookie(res, token, true);
     return res.json({
       token,
       user: {

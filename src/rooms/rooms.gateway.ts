@@ -142,8 +142,30 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   handleDisconnect(client: Socket) {
     const user = this.onlineUsersService.get(client.id);
     if (user && user.roomId) {
+      if (!user.invisible) {
+        const leaveMessage = `left`;
+        void this.dbService
+          .saveChatMessage({
+            roomId: user.roomId,
+            userId: null,
+            nickname: user.nickname,
+            text: leaveMessage,
+            gender: user.gender,
+            isSystem: true,
+          })
+          .then(() => {
+            this.server.to(`room:${user.roomId}`).emit("chat:message", {
+              msgId: Date.now(),
+              socketId: "__system__",
+              nickname: user.nickname,
+              text: leaveMessage,
+              timestamp: Date.now(),
+              gender: user.gender,
+            });
+          });
+      }
+
       client.to(`room:${user.roomId}`).emit("user:leave", client.id);
-      // Сохраняем lastRoomId
       if (!user.isGuest) {
         void this.dbService.updateLastRoomId(user.id, user.roomId);
       }
@@ -394,6 +416,52 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     user.invisible = next;
     client.emit("user:invisibleChanged", { invisible: next });
     if (user.roomId) {
+      // Если включаем невидимку — отправляем сообщение о выходе
+      if (next) {
+        const leaveMessage = "left";
+        void this.dbService
+          .saveChatMessage({
+            roomId: user.roomId,
+            userId: null,
+            nickname: user.nickname,
+            text: leaveMessage,
+            gender: user.gender,
+            isSystem: true,
+          })
+          .then(() => {
+            this.server.to(`room:${user.roomId}`).emit("chat:message", {
+              msgId: Date.now(),
+              socketId: "__system__",
+              nickname: user.nickname,
+              text: leaveMessage,
+              timestamp: Date.now(),
+              gender: user.gender,
+            });
+          });
+      } else {
+        // Если выключаем невидимку — отправляем сообщение о входе
+        const joinMessage = "joined the room";
+
+        void this.dbService
+          .saveChatMessage({
+            roomId: user.roomId,
+            userId: null,
+            nickname: user.nickname,
+            text: joinMessage,
+            gender: user.gender,
+            isSystem: true,
+          })
+          .then(() => {
+            this.server.to(`room:${user.roomId}`).emit("chat:message", {
+              msgId: Date.now(),
+              socketId: "__system__",
+              nickname: user.nickname,
+              text: joinMessage,
+              timestamp: Date.now(),
+              gender: user.gender,
+            });
+          });
+      }
       client.to(`room:${user.roomId}`).emit("user:leave", client.id);
       client.to(`room:${user.roomId}`).emit("user:join", user);
     }
@@ -420,7 +488,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const backgroundType = data.type ?? oldBackgroundType;
     const weather = data.weather ?? oldWeather;
 
-    await this.dbService.updateRoomBackground(user.roomId, backgroundType, weather);
+    await this.dbService.updateRoomBackground(
+      user.roomId,
+      backgroundType,
+      weather,
+    );
 
     // Отправляем системное сообщение в чат
     const changes: string[] = [];
@@ -495,7 +567,15 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           backgroundType: room.backgroundType ?? "grass",
           weather: room.weather ?? "clear",
         }
-      : { id: roomId, name: "Room", creatorId: null, maxUsers: 20, online: 0, backgroundType: "grass" as const, weather: "clear" as const };
+      : {
+          id: roomId,
+          name: "Room",
+          creatorId: null,
+          maxUsers: 20,
+          online: 0,
+          backgroundType: "grass" as const,
+          weather: "clear" as const,
+        };
 
     const usersInRoom = this.onlineUsersService.getByRoom(roomId);
     const sellPercent = await this.dbService.getSettingNumber(
@@ -523,6 +603,27 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       coinPackages,
       daily,
     });
+
+    if (!user.invisible) {
+      const joinMessage = "joined the room";
+      await this.dbService.saveChatMessage({
+        roomId,
+        userId: null,
+        nickname: user.nickname,
+        text: joinMessage,
+        gender: user.gender,
+        isSystem: true,
+      });
+
+      this.server.to(`room:${roomId}`).emit("chat:message", {
+        msgId: Date.now(),
+        socketId: "__system__",
+        nickname: user.nickname,
+        text: joinMessage,
+        timestamp: Date.now(),
+        gender: user.gender,
+      });
+    }
 
     client.to(`room:${roomId}`).emit("user:join", user);
     void this.handleRoomList(client);
