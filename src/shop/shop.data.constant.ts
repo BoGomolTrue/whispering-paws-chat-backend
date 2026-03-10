@@ -206,6 +206,20 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     ...D,
   },
   {
+    id: "minecraft_cap",
+    name: "Minecraft Cap",
+    category: "hats",
+    price: 50,
+    svg: "/accessories/minecraft_cap.png",
+    render: { x: -28, y: -88, w: 56, h: 32 },
+    renderByCharacter: {
+      cat: { x: -54, y: -88, w: 98, h: 51 },
+      fox: { x: -48, y: -68, w: 88, h: 43 },
+    },
+    ...D,
+  },
+
+  {
     id: "red_horns",
     name: "Red Horns",
     category: "hats",
@@ -300,6 +314,28 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     ...D,
     rarity: "rare",
   },
+  {
+    id: "mercedes_benz_c",
+    name: "Mercedes-Benz C-Class",
+    category: "vehicles",
+    price: 1225,
+    svg: "/accessories/mercedes_benz_c.png",
+    render: { x: -33, y: -38, w: 120, h: 100, rotate: -1 },
+    renderByCharacter: {},
+    ...D,
+    rarity: "epic",
+  },
+  {
+    id: "bmw_3_series",
+    name: "BMW 3 Series",
+    category: "vehicles",
+    price: 1325,
+    svg: "/accessories/bmw_3_series.png",
+    render: { x: -33, y: -60, w: 120, h: 136, rotate: -3 },
+    renderByCharacter: {},
+    ...D,
+    rarity: "epic",
+  },
 ];
 
 const SHOP_ITEMS_MAP = new Map(SHOP_ITEMS.map((i) => [i.id, i]));
@@ -351,4 +387,5 @@ export const VALID_CATEGORIES = [
   "masks",
   "bottom",
   "items",
+  "vehicles",
 ] as const;

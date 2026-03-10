@@ -10,6 +10,7 @@ import { Server, Socket } from "socket.io";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
 import { OnlineUsersService } from "../common/services/online-users.service";
 import { VALID_CATEGORIES } from "./shop.data.constant";
+import { getShopTranslations } from "./shop.translations";
 import { ShopService } from "./shop.service";
 
 @WebSocketGateway()
@@ -29,6 +30,15 @@ export class ShopGateway {
   handleShopList(@ConnectedSocket() client: Socket) {
     const items = this.shopService.getItems();
     client.emit("shop:list", items);
+  }
+
+  @SubscribeMessage("shop:translations")
+  handleTranslations(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() locale: 'en' | 'ru' = 'en',
+  ) {
+    const translations = getShopTranslations(locale);
+    client.emit("shop:translations", translations);
   }
 
   @SubscribeMessage("shop:buy")
