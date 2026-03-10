@@ -124,7 +124,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         anketa_avatar: raw.anketa_avatar,
       };
 
-      this.onlineUsersService.add(client.id, onlineUser as any);
+      await this.onlineUsersService.add(client.id, onlineUser as any);
       this.logger.log(
         `Client connected: ${client.id} (${onlineUser.nickname}), joining room ${startRoomId}`,
       );
@@ -161,6 +161,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       creatorId: r.creatorId,
       maxUsers: r.maxUsers,
       online: this.onlineUsersService.getByRoom(r.id).length,
+      backgroundType: r.backgroundType ?? "grass",
+      weather: r.weather ?? "clear",
     }));
     client.emit("room:list", roomList);
   }
@@ -397,6 +399,76 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage("room:setBackground")
+  async handleSetBackground(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { type?: string; weather?: string },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || !user.roomId) return;
+
+    // Только админ или создатель комнаты может менять фон
+    const room = await this.dbService.getRoomById(user.roomId);
+    if (!room) return;
+
+    const isAdmin = user.role === "admin";
+    const isCreator = room.creatorId === user.id;
+    if (!isAdmin && !isCreator) return;
+
+    const oldBackgroundType = room.backgroundType ?? "grass";
+    const oldWeather = room.weather ?? "clear";
+    const backgroundType = data.type ?? oldBackgroundType;
+    const weather = data.weather ?? oldWeather;
+
+    await this.dbService.updateRoomBackground(user.roomId, backgroundType, weather);
+
+    // Отправляем системное сообщение в чат
+    const changes: string[] = [];
+    if (backgroundType !== oldBackgroundType) {
+      const bgNames: Record<string, string> = {
+        grass: "Луг",
+        field: "Поле",
+        mountains: "Горы",
+        snow: "Зима",
+        beach: "Пляж",
+      };
+      changes.push(`фон на "${bgNames[backgroundType] || backgroundType}"`);
+    }
+    if (weather !== oldWeather) {
+      const weatherNames: Record<string, string> = {
+        clear: "Ясно",
+        rain: "Дождь",
+        snow: "Снег",
+      };
+      changes.push(`погоду на "${weatherNames[weather] || weather}"`);
+    }
+
+    if (changes.length > 0) {
+      const message = `${user.nickname} сменил(а) ${changes.join(" и ")}`;
+      await this.dbService.saveChatMessage({
+        roomId: user.roomId,
+        userId: null,
+        nickname: "",
+        text: message,
+        gender: user.gender,
+        isSystem: true,
+      });
+      this.server.to(`room:${user.roomId}`).emit("chat:message", {
+        socketId: "__system__",
+        nickname: "",
+        text: message,
+        timestamp: Date.now(),
+        isSystem: true,
+      });
+    }
+
+    // Уведомляем всех в комнате (включая инициатора) об изменении фона
+    this.server.in(`room:${user.roomId}`).emit("room:backgroundChanged", {
+      backgroundType,
+      weather,
+    });
+  }
+
   private async joinRoom(client: Socket, user: any, roomId: number) {
     if (user.roomId) {
       void client.leave(`room:${user.roomId}`);
@@ -420,8 +492,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           creatorId: room.creatorId,
           maxUsers: room.maxUsers,
           online: this.onlineUsersService.getByRoom(roomId).length,
+          backgroundType: room.backgroundType ?? "grass",
+          weather: room.weather ?? "clear",
         }
-      : { id: roomId, name: "Room", creatorId: null, maxUsers: 20, online: 0 };
+      : { id: roomId, name: "Room", creatorId: null, maxUsers: 20, online: 0, backgroundType: "grass" as const, weather: "clear" as const };
 
     const usersInRoom = this.onlineUsersService.getByRoom(roomId);
     const sellPercent = await this.dbService.getSettingNumber(

@@ -50,6 +50,29 @@ $ npm run start:prod
 # unit tests
 $ npm run test
 
+# test coverage
+$ npm run test:cov
+```
+
+## Database Migrations
+
+Этот проект использует `sequelize-cli` для управления миграциями базы данных.
+
+См. подробную документацию в [MIGRATIONS.md](./MIGRATIONS.md).
+
+### Quick Start
+
+```bash
+# Запуск всех ожидающих миграций
+$ npm run db:migrate
+
+# Откат последней миграции
+$ npm run db:migrate:undo
+
+# Создание новой миграции
+$ npm run db:migrate:generate <name>
+```
+
 # e2e tests
 $ npm run test:e2e
 

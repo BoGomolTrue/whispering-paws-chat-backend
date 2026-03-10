@@ -27,6 +27,18 @@ async function bootstrap() {
   // Настройка WebSocket адаптера
   app.useWebSocketAdapter(new SocketIoAdapter(app));
 
+  // Статика для uploads (до CORS, чтобы файлы отдавались корректно)
+  const httpAdapter = app.getHttpAdapter();
+  const expressApp = httpAdapter.getInstance();
+  expressApp.use(
+    "/uploads",
+    express.static(path.join(process.cwd(), "public", "uploads"), {
+      setHeaders: (res) => {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      },
+    }),
+  );
+
   // CORS настройки
   const allowedOrigins = [
     "https://prod-app.vk-apps.com",
@@ -64,13 +76,6 @@ async function bootstrap() {
         enableImplicitConversion: true,
       },
     }),
-  );
-
-  const httpAdapter = app.getHttpAdapter();
-  const expressApp = httpAdapter.getInstance();
-  expressApp.use(
-    "/uploads",
-    express.static(path.join(process.cwd(), "public", "uploads")),
   );
 
   await app.listen(port, listenHost);

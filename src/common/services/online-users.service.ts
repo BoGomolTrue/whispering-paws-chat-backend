@@ -39,31 +39,43 @@ export class OnlineUsersService {
   private readonly logger = new Logger(OnlineUsersService.name);
   private users: Map<string, OnlineUser> = new Map();
   private io: Server | null = null;
+  private userLocks: Map<number, Promise<void>> = new Map();
 
   setIo(io: Server) {
     this.io = io;
   }
 
-  add(socketId: string, user: OnlineUser): void {
-    const existing = Array.from(this.users.entries()).find(
-      ([, u]) => u.id === user.id && !u.isBot,
-    );
-    if (existing && this.io) {
-      const [oldSocketId, oldUser] = existing;
-      const oldSocket = this.io.sockets.sockets.get(oldSocketId);
-      if (oldSocket) {
-        oldSocket.emit("force:disconnect", "duplicate");
-        oldSocket.disconnect(true);
-      }
-      if (oldUser.roomId && !this.isAdminHidden(oldUser, oldUser.roomId)) {
-        this.io.to(`room:${oldUser.roomId}`).emit("user:leave", oldSocketId);
-      }
-      this.users.delete(oldSocketId);
-      this.logger.debug(
-        `Kicked duplicate user ${oldUser.nickname} (${oldSocketId})`,
+  async add(socketId: string, user: OnlineUser): Promise<void> {
+    // Ждём, если есть активная блокировка для этого пользователя
+    const lock = this.userLocks.get(user.id);
+    if (lock) await lock;
+
+    // Создаём новую блокировку
+    const lockPromise = (async () => {
+      const existing = Array.from(this.users.entries()).find(
+        ([, u]) => u.id === user.id && !u.isBot,
       );
-    }
-    this.users.set(socketId, user);
+      if (existing && this.io) {
+        const [oldSocketId, oldUser] = existing;
+        const oldSocket = this.io.sockets.sockets.get(oldSocketId);
+        if (oldSocket) {
+          oldSocket.emit("force:disconnect", "duplicate");
+          oldSocket.disconnect(true);
+        }
+        if (oldUser.roomId && !this.isAdminHidden(oldUser, oldUser.roomId)) {
+          this.io.to(`room:${oldUser.roomId}`).emit("user:leave", oldSocketId);
+        }
+        this.users.delete(oldSocketId);
+        this.logger.debug(
+          `Kicked duplicate user ${oldUser.nickname} (${oldSocketId})`,
+        );
+      }
+      this.users.set(socketId, user);
+    })();
+
+    this.userLocks.set(user.id, lockPromise);
+    await lockPromise;
+    this.userLocks.delete(user.id);
   }
 
   remove(socketId: string): void {

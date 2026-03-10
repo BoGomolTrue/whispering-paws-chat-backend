@@ -36,6 +36,16 @@ export class Room extends Model<Room> {
   @Column(DataType.INTEGER)
   maxUsers: number;
 
+  @Default("grass")
+  @AllowNull(false)
+  @Column(DataType.STRING(20))
+  backgroundType: string;
+
+  @Default("clear")
+  @AllowNull(false)
+  @Column(DataType.STRING(20))
+  weather: string;
+
   @ForeignKey(() => User)
   @BelongsTo(() => User, { foreignKey: "creatorId", as: "creator" })
   creator: User;

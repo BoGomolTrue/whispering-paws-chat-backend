@@ -677,4 +677,15 @@ export class DatabaseService implements OnModuleInit {
 
     return { coins: newCoins };
   }
+
+  async updateRoomBackground(
+    roomId: number,
+    backgroundType: string,
+    weather: string,
+  ): Promise<void> {
+    await this.roomRepository.update(
+      { backgroundType, weather },
+      { where: { id: roomId } },
+    );
+  }
 }
