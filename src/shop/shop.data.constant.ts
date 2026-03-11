@@ -20,9 +20,10 @@ export interface ShopItemRaw {
   isActive: boolean;
   rarity?: string;
   salePercent: number;
-  saleEndsAt: number | null; // Changed from string | null to number | null
+  saleEndsAt: number | null;
   availableFrom: string | null;
   availableUntil: string | null;
+  genderFilter?: "male" | "female" | "all";
 }
 
 const R = { x: -40, y: -74, w: 80, h: 120 };
@@ -37,6 +38,7 @@ const D = {
   saleEndsAt: null,
   availableFrom: null,
   availableUntil: null,
+  genderFilter: "all" as const,
 };
 
 const SHOP_ITEMS: ShopItemRaw[] = [
@@ -238,6 +240,176 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     ...D,
     rarity: "epic",
   },
+  {
+    id: "drone",
+    name: "Drone",
+    category: "items",
+    price: 1300,
+    svg: "/accessories/drone.svg",
+    render: { x: 32, y: -88, w: 46, h: 46, rotate: 3 },
+
+    ...D,
+    rarity: "epic",
+  },
+  {
+    id: "black_hoodie",
+    name: "Black Hoodie",
+    category: "tops",
+    price: 180,
+    svg: "/accessories/test_hoodie.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -45, y: -86, w: 96, h: 126 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "green_skateboard_sneakers",
+    name: "Green skateboard sneakers",
+    category: "shoes",
+    price: 170,
+    svg: "/accessories/green_skateboard_sneakers.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -19, y: 17, w: 43, h: 27 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "stripped_long_sleeve",
+    name: "Stripped Long Sleeve",
+    category: "tops",
+    price: 150,
+    svg: "/accessories/stripped_long_sleeve.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -42, y: -34, w: 90, h: 59 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "black_hoodie_paws",
+    name: "Black Hoodie Paws",
+    category: "tops",
+    price: 160,
+    svg: "/accessories/black_hoodie_paws.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -37, y: -35, w: 77, h: 55 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "blue_jeens",
+    name: "Blue Jeans",
+    category: "bottom",
+    price: 150,
+    svg: "/accessories/blue_jeens.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -25, y: -8, w: 54, h: 47 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "cargo_pant",
+    name: "Cargo Pant",
+    category: "bottom",
+    price: 160,
+    svg: "/accessories/cargo_pant.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -35, y: -7, w: 74, h: 46 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "splatter_cargo_pant",
+    name: "Splatter Cargo Pant",
+    category: "bottom",
+    price: 180,
+    svg: "/accessories/splatter_cargo.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -23, y: 1, w: 48, h: 30 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "embroidered_pant",
+    name: "Embroidered Pant",
+    category: "bottom",
+    price: 170,
+    svg: "/accessories/embroidered_pant.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -20, y: 1, w: 44, h: 27 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "urban_acid_jeans",
+    name: "Urban Acid Jeans",
+    category: "bottom",
+    price: 160,
+    svg: "/accessories/urban_acid_pant.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -20, y: 3, w: 46, h: 28 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "punk_pleated",
+    name: "Punk Pleated",
+    category: "bottom",
+    price: 170,
+    svg: "/accessories/punk_pleated.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -34, y: -7, w: 76, h: 46 },
+    },
+    ...D,
+    rarity: "common",
+    genderFilter: "female",
+  },
+  {
+    id: "pink_pant",
+    name: "Pink Pant",
+    category: "bottom",
+    price: 150,
+    svg: "/accessories/pink_pant.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -48, y: 1, w: 107, h: 34 },
+    },
+    ...D,
+    rarity: "common",
+    genderFilter: "female",
+  },
+  {
+    id: "anime_pant",
+    name: "Anime Pant",
+    category: "bottom",
+    price: 180,
+    svg: "/accessories/anime_pant.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -50, y: -5, w: 115, h: 48 },
+    },
+    ...D,
+    rarity: "common",
+  },
+
   // ========== HATS (Головные уборы) ==========
   // Common
   {
@@ -398,7 +570,7 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     category: "vehicles",
     price: 1500,
     svg: "/accessories/mercedes_benz_c.png",
-    render: { x: -33, y: -38, w: 120, h: 100, rotate: -1 },
+    render: { x: -33, y: -33, w: 120, h: 92, rotate: -1 },
     renderByCharacter: {},
     ...D,
     rarity: "epic",
@@ -409,11 +581,73 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     category: "vehicles",
     price: 1750,
     svg: "/accessories/bmw_3_series.png",
-    render: { x: -33, y: -60, w: 120, h: 136, rotate: -3 },
+    render: { x: -33, y: -53, w: 113, h: 126, rotate: -3 },
     renderByCharacter: {},
     ...D,
     rarity: "epic",
   },
+
+  // ========== TATTOOS (Татуировки) ==========
+  // Common
+  {
+    id: "symbols_tatoo",
+    name: "Symbols Tattoo",
+    category: "tattoos",
+    price: 200,
+    svg: "/accessories/symbols_tatoo.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -24, y: -34, w: 48, h: 51 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "tatoo_m",
+    name: "M Tattoo",
+    category: "tattoos",
+    price: 220,
+    svg: "/accessories/tatoo_m.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: 5, y: -41, w: 20, h: 16 },
+      dog: { x: -30, y: -40, w: 60, h: 60 },
+      fox: { x: -30, y: -40, w: 60, h: 60 },
+      panda: { x: -30, y: -40, w: 60, h: 60 },
+      raccoon: { x: -30, y: -40, w: 60, h: 60 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "skull_tatoo",
+    name: "Skull Tattoo",
+    category: "tattoos",
+    price: 250,
+    svg: "/accessories/skull_tatoo.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -7, y: -9, w: 32, h: 27 },
+    },
+    ...D,
+    rarity: "common",
+  },
+  {
+    id: "heart_tatto",
+    name: "Heart Tattoo",
+    category: "tattoos",
+    price: 280,
+    svg: "/accessories/heart_tatto.png",
+    render: { x: -30, y: -40, w: 60, h: 60 },
+    renderByCharacter: {
+      cat: { x: -15, y: -20, w: 25, h: 29 },
+    },
+    ...D,
+    rarity: "common",
+  },
+
+  // ========== GLASSES (Очки) ==========
+  // Common
 ];
 
 const SHOP_ITEMS_MAP = new Map(SHOP_ITEMS.map((i) => [i.id, i]));
@@ -456,7 +690,15 @@ export function applyEffectivePrice(
 export function getShopItemsForClient(): (ShopItemRaw & {
   effectivePrice: number;
 })[] {
-  return getActiveShopItems().map(applyEffectivePrice);
+  const isDev = process.env.NODE_ENV === "development";
+  return getActiveShopItems().map((item) => {
+    const withPrice = applyEffectivePrice(item);
+    // В development режиме все предметы доступны для всех
+    if (isDev) {
+      return { ...withPrice, genderFilter: "all" as const };
+    }
+    return withPrice;
+  });
 }
 
 export const VALID_CATEGORIES = [
@@ -464,6 +706,10 @@ export const VALID_CATEGORIES = [
   "hats",
   "masks",
   "bottom",
+  "tops",
+  "shoes",
   "items",
   "vehicles",
+  "tattoos",
+  "glasses",
 ] as const;

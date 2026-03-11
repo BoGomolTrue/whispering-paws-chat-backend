@@ -94,10 +94,14 @@ export class DatabaseService implements OnModuleInit {
       chains: null,
       tattoo: null,
       bottom: null,
+      tops: null,
       shoes: null,
       clothing: null,
       transport: null,
       items: null,
+      vehicles: null,
+      tattoos: null,
+      glasses: null,
     };
     const equippedColors: Record<string, string | null> = { ...equipped };
 
