@@ -360,7 +360,7 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     name: "Urban Acid Jeans",
     category: "bottom",
     price: 160,
-    svg: "/accessories/urban_acid_pant.png",
+    svg: "/accessories/urban_acid_jeans.png",
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -20, y: 3, w: 46, h: 28 },
@@ -469,6 +469,17 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     },
     ...D,
     rarity: "uncommon",
+  },
+  {
+    id: "spacesuit",
+    name: "Spacesuit",
+    category: "hats",
+    price: 600,
+    svg: "/accessories/spacesuit.png",
+    render: { x: -38, y: -71, w: 76, h: 65 },
+    renderByCharacter: { cat: { x: -35, y: -82, w: 71, h: 64 } },
+    ...D,
+    rarity: "epic",
   },
 
   // ========== MASKS (Маски и цепи) ==========
