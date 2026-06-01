@@ -18,7 +18,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            cd /root/whispering-paws-chat-backend
+            cd /home/whispering-paws-chat-backend
             git pull origin master
             npm cache clean --force
             npm install --prefer-offline --no-audit --no-fund
