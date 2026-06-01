@@ -92,6 +92,7 @@ export class AuthController {
         eyeColor: user.eyeColor,
         banned: user.banned,
         role: user.role,
+        tutorialCompleted: (user as any).tutorialCompleted,
       },
     });
   }

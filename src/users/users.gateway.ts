@@ -21,6 +21,7 @@ const PROFILE_KEYS = [
   "gender",
   "notificationsOff",
   "animationsOff",
+  "tutorialCompleted",
   "anketa_about",
   "anketa_city",
   "anketa_interests",

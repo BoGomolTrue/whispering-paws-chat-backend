@@ -156,6 +156,11 @@ export class User extends Model<User> {
   @Column(DataType.STRING(500))
   anketa_avatar: string | null;
 
+  @Default(false)
+  @AllowNull(false)
+  @Column(DataType.BOOLEAN)
+  tutorialCompleted: boolean;
+
   @HasMany(() => UserItem)
   items: UserItem[];
 
