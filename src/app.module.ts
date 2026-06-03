@@ -8,6 +8,7 @@ import { CommonModule } from "./common/common.module";
 import { DailyModule } from "./daily/daily.module";
 import { DatabaseModule } from "./database/database.module";
 import { FilesModule } from "./files/files.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 import { PaymentModule } from "./payment/payment.module";
 import { RoomsModule } from "./rooms/rooms.module";
 import { ShopModule } from "./shop/shop.module";
@@ -28,6 +29,7 @@ import { UsersModule } from "./users/users.module";
     ShopModule,
     PaymentModule,
     DailyModule,
+    NotificationsModule,
     BotsModule,
     AiModule,
     FilesModule,

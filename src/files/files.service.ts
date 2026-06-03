@@ -37,6 +37,17 @@ export class FilesService {
     return `/uploads/${filename}`;
   }
 
+  async saveRoomPhoto(dataUrl: string, roomId: number): Promise<string> {
+    const { buffer, ext } = this.parseDataUrl(dataUrl);
+    if (buffer.length > 2 * 1024 * 1024) throw new Error("TOO_LARGE");
+
+    const filename = `room_${roomId}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
+    const filePath = path.join(this.uploadsDir, filename);
+
+    await fs.promises.writeFile(filePath, buffer);
+    return `/uploads/${filename}`;
+  }
+
   private parseDataUrl(dataUrl: string): { buffer: Buffer; ext: string } {
     const match = dataUrl.match(
       /^data:image\/(jpeg|jpg|png|gif|webp);base64,(.+)$/i,

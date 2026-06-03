@@ -7,6 +7,7 @@ import { DirectMessage } from "./models/direct-message.model";
 import { Rank } from "./models/rank.model";
 import { Room } from "./models/room.model";
 import { Setting } from "./models/settings.model";
+import { Notification } from "./models/notification.model";
 import { UserDaily } from "./models/user-daily.model";
 import { UserEquipped } from "./models/user-equipped.model";
 import { UserItem } from "./models/user-item.model";
@@ -30,6 +31,7 @@ import { User } from "./models/user.model";
           Setting,
           Rank,
           UserDaily,
+          Notification,
         ],
         autoLoadModels: true,
         synchronize: configService.get("NODE_ENV") !== "production",
@@ -48,6 +50,7 @@ import { User } from "./models/user.model";
       Setting,
       Rank,
       UserDaily,
+      Notification,
     ]),
   ],
   providers: [DatabaseService],

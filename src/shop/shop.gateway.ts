@@ -9,6 +9,7 @@ import {
 import { Server, Socket } from "socket.io";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
 import { OnlineUsersService } from "../common/services/online-users.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { VALID_CATEGORIES } from "./shop.data.constant";
 import { getShopTranslations } from "./shop.translations";
 import { ShopService } from "./shop.service";
@@ -24,6 +25,7 @@ export class ShopGateway {
   constructor(
     private shopService: ShopService,
     private onlineUsersService: OnlineUsersService,
+    private notificationsService: NotificationsService,
   ) {}
 
   @SubscribeMessage("shop:list")
@@ -147,6 +149,12 @@ export class ShopGateway {
           itemName: item.name ?? itemId,
           ownedItems: recipient.ownedItems,
           inventoryValue: recipient.inventoryValue,
+        });
+        void this.notificationsService.onGiftReceived(recipientSock, data.toUserId, {
+          fromNickname: user.nickname,
+          itemId,
+          itemName: item.name ?? itemId,
+          fromUserId: user.id,
         });
       }
       client.emit("gift:sent", { toUserId: data.toUserId, itemId });

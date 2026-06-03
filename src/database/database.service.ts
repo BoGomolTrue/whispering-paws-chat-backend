@@ -15,6 +15,7 @@ import { UserDaily } from "./models/user-daily.model";
 import { UserEquipped } from "./models/user-equipped.model";
 import { UserItem } from "./models/user-item.model";
 import { User } from "./models/user.model";
+import { Notification } from "./models/notification.model";
 
 export interface DbUserRow {
   id: number;
@@ -64,6 +65,8 @@ export class DatabaseService implements OnModuleInit {
     @InjectModel(Setting) private settingRepository: typeof Setting,
     @InjectModel(Rank) private rankRepository: typeof Rank,
     @InjectModel(UserDaily) private userDailyRepository: typeof UserDaily,
+    @InjectModel(Notification)
+    private notificationRepository: typeof Notification,
   ) {}
 
   async onModuleInit() {
@@ -266,8 +269,28 @@ export class DatabaseService implements OnModuleInit {
   }
 
   // === ROOMS ===
-  async createRoom(name: string, creatorId: number): Promise<Room> {
-    return this.roomRepository.create({ name, creatorId } as any);
+  async createRoom(
+    name: string,
+    creatorId: number,
+    photoUrl: string | null = null,
+    description: string | null = null,
+  ): Promise<Room> {
+    return this.roomRepository.create({
+      name,
+      creatorId,
+      photoUrl,
+      description,
+    } as any);
+  }
+
+  async updateRoom(
+    roomId: number,
+    data: { name?: string; photoUrl?: string | null; description?: string | null },
+  ): Promise<Room | null> {
+    const room = await this.getRoomById(roomId);
+    if (!room) return null;
+    await this.roomRepository.update(data, { where: { id: roomId } });
+    return this.getRoomById(roomId);
   }
 
   async getRooms(): Promise<Room[]> {
@@ -690,6 +713,79 @@ export class DatabaseService implements OnModuleInit {
     await this.roomRepository.update(
       { backgroundType, weather },
       { where: { id: roomId } },
+    );
+  }
+
+  async getNotifications(userId: number, limit = 50) {
+    const rows = await this.notificationRepository.findAll({
+      where: { userId },
+      order: [["createdAt", "DESC"]],
+      limit,
+    });
+    return rows.map((row) => {
+      const plain = row.get({ plain: true }) as any;
+      return {
+        id: plain.id,
+        type: plain.type,
+        payload: plain.payload ?? {},
+        read: plain.read,
+        createdAt: new Date(plain.createdAt).getTime(),
+      };
+    });
+  }
+
+  async getUnreadNotificationCount(userId: number): Promise<number> {
+    return this.notificationRepository.count({
+      where: { userId, read: false },
+    });
+  }
+
+  async findUnreadNotification(userId: number, type: string) {
+    return this.notificationRepository.findOne({
+      where: { userId, type, read: false },
+    });
+  }
+
+  async createNotification(
+    userId: number,
+    type: string,
+    payload: Record<string, unknown> = {},
+  ) {
+    const row = await this.notificationRepository.create({
+      userId,
+      type,
+      payload,
+      read: false,
+    } as any);
+    const plain = row.get({ plain: true }) as any;
+    return {
+      id: plain.id,
+      type: plain.type,
+      payload: plain.payload ?? {},
+      read: plain.read,
+      createdAt: new Date(plain.createdAt).getTime(),
+    };
+  }
+
+  async markNotificationRead(id: number, userId: number): Promise<boolean> {
+    const [updated] = await this.notificationRepository.update(
+      { read: true },
+      { where: { id, userId, read: false } },
+    );
+    return updated > 0;
+  }
+
+  async markAllNotificationsRead(userId: number): Promise<void> {
+    await this.notificationRepository.update(
+      { read: true },
+      { where: { userId, read: false } },
+    );
+  }
+
+  async markNotificationsReadByType(userId: number, type: string): Promise<void> {
+    await this.notificationRepository.update(
+      { read: true },
+      { where: { userId, type, read: false } },
     );
   }
 }

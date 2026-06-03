@@ -46,6 +46,16 @@ export class Room extends Model<Room> {
   @Column(DataType.STRING(20))
   weather: string;
 
+  @Default(null)
+  @AllowNull(true)
+  @Column(DataType.STRING(255))
+  photoUrl: string | null;
+
+  @Default(null)
+  @AllowNull(true)
+  @Column(DataType.TEXT)
+  description: string | null;
+
   @ForeignKey(() => User)
   @BelongsTo(() => User, { foreignKey: "creatorId", as: "creator" })
   creator: User;

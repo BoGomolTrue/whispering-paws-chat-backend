@@ -30,6 +30,13 @@ export class ChatGateway {
     private filesService: FilesService,
   ) {}
 
+  private async isGuestUser(userId: number): Promise<boolean> {
+    const online = this.onlineUsersService.getById(userId);
+    if (online?.isGuest) return true;
+    const dbUser = await this.dbService.getUserById(userId);
+    return dbUser?.isGuest === true;
+  }
+
   @SubscribeMessage("chat:message")
   async handleMessage(
     @ConnectedSocket() client: Socket,
@@ -41,6 +48,7 @@ export class ChatGateway {
     if (!msg?.text?.trim()) return;
     if (!this.rateLimitService.checkLimit(client.id, "chat", 10000, 5)) return;
 
+    this.onlineUsersService.touchActivity(client.id);
     const text = msg.text.trim().substring(0, 500);
 
     // Save message
@@ -80,6 +88,7 @@ export class ChatGateway {
   handleTyping(@ConnectedSocket() client: Socket) {
     const user = this.onlineUsersService.get(client.id);
     if (!user || !user.roomId) return;
+    this.onlineUsersService.touchActivity(client.id);
     client.to(`room:${user.roomId}`).emit("chat:typing", {
       socketId: client.id,
       nickname: user.nickname,
@@ -158,6 +167,10 @@ export class ChatGateway {
   ) {
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.isGuest || data?.withUserId == null) return;
+    if (await this.isGuestUser(data.withUserId)) {
+      client.emit("room:error", "Cannot message guests");
+      return;
+    }
     const messages = await this.dbService.getDirectMessages(
       user.id,
       data.withUserId,
@@ -200,6 +213,10 @@ export class ChatGateway {
   ) {
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.isGuest || data?.toUserId == null) return;
+    if (await this.isGuestUser(data.toUserId)) {
+      client.emit("room:error", "Cannot message guests");
+      return;
+    }
     const text = (data.text ?? "").trim().substring(0, 500);
     if (!text) return;
     const saved = await this.dbService.saveDirectMessage(
@@ -217,15 +234,13 @@ export class ChatGateway {
     };
     client.emit("dm:message", msg);
     const recipient = this.onlineUsersService.getById(data.toUserId);
-    if (recipient) {
+    if (recipient && !recipient.isGuest) {
       const sock = this.server.sockets.sockets.get(recipient.socketId);
       if (sock) sock.emit("dm:message", msg);
     }
     const fromLast = await this.dbService.getLastDmFrom(data.toUserId);
-    if (fromLast === user.id) {
-      const recipientSock = recipient
-        ? this.server.sockets.sockets.get(recipient.socketId)
-        : null;
+    if (fromLast === user.id && recipient && !recipient.isGuest) {
+      const recipientSock = this.server.sockets.sockets.get(recipient.socketId);
       if (recipientSock)
         recipientSock.emit("dm:unread", {
           fromUserId: user.id,
@@ -243,6 +258,10 @@ export class ChatGateway {
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.isGuest || data?.toUserId == null || !data?.dataUrl)
       return;
+    if (await this.isGuestUser(data.toUserId)) {
+      client.emit("room:error", "Cannot message guests");
+      return;
+    }
     const caption = (data.text ?? "").trim().substring(0, 500);
     try {
       const imageUrl = await this.filesService.saveChatImage(data.dataUrl);
@@ -263,12 +282,12 @@ export class ChatGateway {
       };
       client.emit("dm:message", msg);
       const recipient = this.onlineUsersService.getById(data.toUserId);
-      if (recipient) {
+      if (recipient && !recipient.isGuest) {
         const sock = this.server.sockets.sockets.get(recipient.socketId);
         if (sock) sock.emit("dm:message", msg);
       }
       const fromLast = await this.dbService.getLastDmFrom(data.toUserId);
-      if (fromLast === user.id && recipient) {
+      if (fromLast === user.id && recipient && !recipient.isGuest) {
         const recipientSock = this.server.sockets.sockets.get(
           recipient.socketId,
         );

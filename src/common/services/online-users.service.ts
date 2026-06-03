@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Server } from "socket.io";
+import { AFK_IDLE_MS } from "../constants/afk.constants";
 
 export interface OnlineUser {
   id: number;
@@ -32,6 +33,8 @@ export interface OnlineUser {
   anketa_age?: string | null;
   anketa_avatar?: string | null;
   isBot?: boolean;
+  lastActiveAt: number;
+  afk?: boolean;
 }
 
 @Injectable()
@@ -40,9 +43,57 @@ export class OnlineUsersService {
   private users: Map<string, OnlineUser> = new Map();
   private io: Server | null = null;
   private userLocks: Map<number, Promise<void>> = new Map();
+  private afkBySocket = new Map<string, boolean>();
+  private afkTimer: ReturnType<typeof setInterval> | null = null;
 
   setIo(io: Server) {
     this.io = io;
+  }
+
+  startAfkWatcher() {
+    if (this.afkTimer) return;
+    this.afkTimer = setInterval(() => this.syncAfkStates(), 10_000);
+  }
+
+  touchActivity(socketId: string) {
+    const user = this.users.get(socketId);
+    if (!user) return;
+    user.lastActiveAt = Date.now();
+    if (user.afk) {
+      user.afk = false;
+      this.afkBySocket.set(socketId, false);
+      this.emitAfk(user, false);
+    }
+  }
+
+  markAway(socketId: string) {
+    const user = this.users.get(socketId);
+    if (!user) return;
+    user.lastActiveAt = Date.now() - AFK_IDLE_MS - 1;
+    this.applyAfk(user, true);
+  }
+
+  private syncAfkStates() {
+    const now = Date.now();
+    for (const [, user] of this.users) {
+      if (!user.roomId || user.isBot) continue;
+      const afk = now - user.lastActiveAt > AFK_IDLE_MS;
+      this.applyAfk(user, afk);
+    }
+  }
+
+  private applyAfk(user: OnlineUser, afk: boolean) {
+    const prev = this.afkBySocket.get(user.socketId) ?? false;
+    if (prev === afk) return;
+    this.afkBySocket.set(user.socketId, afk);
+    user.afk = afk;
+    this.emitAfk(user, afk);
+  }
+
+  private emitAfk(user: OnlineUser, afk: boolean) {
+    if (!this.io || !user.roomId || this.isAdminHidden(user, user.roomId)) return;
+    const payload = { socketId: user.socketId, afk };
+    this.io.to(`room:${user.roomId}`).emit("user:afk", payload);
   }
 
   async add(socketId: string, user: OnlineUser): Promise<void> {
@@ -70,7 +121,13 @@ export class OnlineUsersService {
           `Kicked duplicate user ${oldUser.nickname} (${oldSocketId})`,
         );
       }
-      this.users.set(socketId, user);
+      const now = Date.now();
+      this.users.set(socketId, {
+        ...user,
+        lastActiveAt: user.lastActiveAt ?? now,
+        afk: false,
+      });
+      this.afkBySocket.set(socketId, false);
     })();
 
     this.userLocks.set(user.id, lockPromise);
@@ -80,6 +137,7 @@ export class OnlineUsersService {
 
   remove(socketId: string): void {
     this.users.delete(socketId);
+    this.afkBySocket.delete(socketId);
   }
 
   get(socketId: string): OnlineUser | undefined {
@@ -92,6 +150,14 @@ export class OnlineUsersService {
 
   getByRoom(roomId: number): OnlineUser[] {
     return Array.from(this.users.values()).filter((u) => u.roomId === roomId);
+  }
+
+  countsInRoomOnline(user: OnlineUser): boolean {
+    return !(user.role === "admin" && user.invisible);
+  }
+
+  countRoomOnline(roomId: number): number {
+    return this.getByRoom(roomId).filter((u) => this.countsInRoomOnline(u)).length;
   }
 
   getAll(): OnlineUser[] {

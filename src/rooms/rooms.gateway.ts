@@ -4,32 +4,87 @@ import {
   MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
+import { getSalaryCooldownRemain } from "../common/utils/salary.util";
 import { OnlineUsersService } from "../common/services/online-users.service";
 import { DatabaseService } from "../database/database.service";
+import { FilesService } from "../files/files.service";
 import { PaymentService } from "../payment/payment.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { ShopService } from "../shop/shop.service";
 
 @WebSocketGateway()
 @UseGuards(WsJwtGuard)
-export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RoomsGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
+{
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(RoomsGateway.name);
+
+  afterInit() {
+    this.onlineUsersService.setIo(this.server);
+    this.onlineUsersService.startAfkWatcher();
+  }
 
   constructor(
     private dbService: DatabaseService,
     private onlineUsersService: OnlineUsersService,
     private shopService: ShopService,
     private paymentService: PaymentService,
+    private notificationsService: NotificationsService,
+    private filesService: FilesService,
     private wsJwtGuard: WsJwtGuard,
   ) {}
+
+  private isSystemRoom(room: { name: string }) {
+    return room.name === "General Room" || room.name === "Guest Room";
+  }
+
+  private mapRoomDto(room: {
+    id: number;
+    name: string;
+    creatorId: number | null;
+    maxUsers: number;
+    backgroundType?: string;
+    weather?: string;
+    photoUrl?: string | null;
+    description?: string | null;
+  }) {
+    return {
+      id: room.id,
+      name: room.name,
+      creatorId: room.creatorId,
+      maxUsers: room.maxUsers,
+      online: this.onlineUsersService.countRoomOnline(room.id),
+      backgroundType: room.backgroundType ?? "grass",
+      weather: room.weather ?? "clear",
+      photoUrl: room.photoUrl ?? null,
+      description: room.description ?? null,
+    };
+  }
+
+  private async emitRoomOnlineUpdate(roomId: number) {
+    const room = await this.dbService.getRoomById(roomId);
+    if (room) {
+      this.server.emit("room:updated", this.mapRoomDto(room));
+    }
+  }
+
+  private async resolvePhotoDataUrl(
+    dataUrl: string | undefined,
+    roomId: number,
+  ): Promise<string | null> {
+    if (!dataUrl || typeof dataUrl !== "string") return null;
+    return this.filesService.saveRoomPhoto(dataUrl, roomId);
+  }
 
   private buildEquippedDefaults(): Record<string, string | null> {
     return {
@@ -114,7 +169,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         ),
         notificationsOff: raw.notificationsOff,
         animationsOff: raw.animationsOff,
-        invisible: raw.invisible,
+        invisible: !!raw.invisible,
         isGuest: isGuest || undefined,
         anketa_about: raw.anketa_about,
         anketa_city: raw.anketa_city,
@@ -122,6 +177,8 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         anketa_looking_for: raw.anketa_looking_for,
         anketa_age: raw.anketa_age,
         anketa_avatar: raw.anketa_avatar,
+        lastActiveAt: Date.now(),
+        afk: false,
       };
 
       await this.onlineUsersService.add(client.id, onlineUser as any);
@@ -141,8 +198,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     const user = this.onlineUsersService.get(client.id);
+    if (user) {
+      this.notificationsService.clearSchedule(user.id);
+    }
     if (user && user.roomId) {
-      if (!user.invisible) {
+      if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
         const leaveMessage = `left`;
         void this.dbService
           .saveChatMessage({
@@ -165,34 +225,35 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           });
       }
 
-      client.to(`room:${user.roomId}`).emit("user:leave", client.id);
+      if (
+        !this.onlineUsersService.isAdminHidden(user, user.roomId)
+      ) {
+        client.to(`room:${user.roomId}`).emit("user:leave", client.id);
+      }
       if (!user.isGuest) {
         void this.dbService.updateLastRoomId(user.id, user.roomId);
       }
     }
+    const leftRoomId = user?.roomId;
     this.onlineUsersService.remove(client.id);
+    if (leftRoomId) {
+      void this.emitRoomOnlineUpdate(leftRoomId);
+    }
     this.logger.log(`Client disconnected: ${client.id}`);
   }
 
   @SubscribeMessage("room:list")
   async handleRoomList(@ConnectedSocket() client: Socket) {
     const rooms = await this.dbService.getRooms();
-    const roomList = rooms.map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      creatorId: r.creatorId,
-      maxUsers: r.maxUsers,
-      online: this.onlineUsersService.getByRoom(r.id).length,
-      backgroundType: r.backgroundType ?? "grass",
-      weather: r.weather ?? "clear",
-    }));
+    const roomList = rooms.map((r) => this.mapRoomDto(r));
     client.emit("room:list", roomList);
   }
 
   @SubscribeMessage("room:create")
   async handleRoomCreate(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { name?: string },
+    @MessageBody()
+    data: { name?: string; description?: string; photoDataUrl?: string },
   ) {
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.isGuest) {
@@ -206,18 +267,99 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    const description = data?.description?.trim().slice(0, 500) || null;
+
     try {
-      const room = await this.dbService.createRoom(name, user.id);
+      const room = await this.dbService.createRoom(
+        name,
+        user.id,
+        null,
+        description,
+      );
+      if (data?.photoDataUrl) {
+        try {
+          const photoUrl = await this.resolvePhotoDataUrl(
+            data.photoDataUrl,
+            room.id,
+          );
+          if (photoUrl) {
+            await this.dbService.updateRoom(room.id, { photoUrl });
+            room.photoUrl = photoUrl;
+          }
+        } catch {
+          void client.emit("room:error", "Invalid room photo");
+        }
+      }
       void this.joinRoom(client, user, room.id);
-      void this.server.emit("room:created", {
-        id: room.id,
-        name: room.name,
-        creatorId: room.creatorId,
-        maxUsers: room.maxUsers,
-        online: 1,
-      });
+      void this.server.emit("room:created", this.mapRoomDto(room));
     } catch {
       void client.emit("room:error", "Room name already taken");
+    }
+  }
+
+  @SubscribeMessage("room:update")
+  async handleRoomUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      roomId?: number;
+      name?: string;
+      description?: string;
+      photoDataUrl?: string;
+      removePhoto?: boolean;
+    },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || !data?.roomId) return;
+
+    const room = await this.dbService.getRoomById(data.roomId);
+    if (!room || room.creatorId !== user.id || this.isSystemRoom(room)) {
+      client.emit("room:error", "Not allowed");
+      return;
+    }
+
+    const updates: {
+      name?: string;
+      photoUrl?: string | null;
+      description?: string | null;
+    } = {};
+
+    if (data.name !== undefined) {
+      const name = data.name.trim();
+      if (!name || name.length > 50) {
+        client.emit("room:error", "Invalid room name");
+        return;
+      }
+      updates.name = name;
+    }
+
+    if (data.description !== undefined) {
+      const description = data.description.trim().slice(0, 500);
+      updates.description = description || null;
+    }
+
+    if (data.removePhoto) {
+      updates.photoUrl = null;
+    } else if (data.photoDataUrl) {
+      try {
+        updates.photoUrl = await this.resolvePhotoDataUrl(
+          data.photoDataUrl,
+          room.id,
+        );
+      } catch {
+        client.emit("room:error", "Invalid room photo");
+        return;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) return;
+
+    try {
+      const updated = await this.dbService.updateRoom(room.id, updates);
+      if (!updated) return;
+      this.server.emit("room:updated", this.mapRoomDto(updated));
+    } catch {
+      client.emit("room:error", "Room name already taken");
     }
   }
 
@@ -276,6 +418,16 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
+  @SubscribeMessage("user:active")
+  handleUserActive(@ConnectedSocket() client: Socket) {
+    this.onlineUsersService.touchActivity(client.id);
+  }
+
+  @SubscribeMessage("user:away")
+  handleUserAway(@ConnectedSocket() client: Socket) {
+    this.onlineUsersService.markAway(client.id);
+  }
+
   @SubscribeMessage("move")
   handleMove(
     @ConnectedSocket() client: Socket,
@@ -285,11 +437,14 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!user || !user.roomId || data?.x == null || data?.y == null) return;
     user.x = data.x;
     user.y = data.y;
-    client.to(`room:${user.roomId}`).emit("user:move", {
-      socketId: client.id,
-      x: data.x,
-      y: data.y,
-    });
+    this.onlineUsersService.touchActivity(client.id);
+    if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
+      client.to(`room:${user.roomId}`).emit("user:move", {
+        socketId: client.id,
+        x: data.x,
+        y: data.y,
+      });
+    }
   }
 
   @SubscribeMessage("emotion")
@@ -300,10 +455,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = this.onlineUsersService.get(client.id);
     if (!user || !user.roomId || typeof emotion !== "string") return;
     user.emotion = emotion;
-    client.to(`room:${user.roomId}`).emit("user:emotion", {
-      socketId: client.id,
-      emotion,
-    });
+    this.onlineUsersService.touchActivity(client.id);
+    if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
+      client.to(`room:${user.roomId}`).emit("user:emotion", {
+        socketId: client.id,
+        emotion,
+      });
+    }
 
     // Отправляем системное сообщение в чат о смене эмоции
     const emotionNames: Record<string, string> = {
@@ -355,17 +513,16 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     await this.dbService.updateNickname(user.id, name);
     user.nickname = name;
-    client.to(`room:${user.roomId}`).emit("user:nickname", {
-      socketId: client.id,
-      nickname: name,
-    });
+    if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
+      client.to(`room:${user.roomId}`).emit("user:nickname", {
+        socketId: client.id,
+        nickname: name,
+      });
+    }
   }
 
   private getSalaryCooldownRemain(user: any): number {
-    const base = 5 * 60 * 1000;
-    const extra = 30 * 1000;
-    const cd = base + (user.salaryClaimCount || 0) * extra;
-    return Math.max(0, cd - (Date.now() - (user.lastSalaryAt || 0)));
+    return getSalaryCooldownRemain(user.lastSalaryAt ?? 0, user.salaryClaimCount ?? 0);
   }
 
   @SubscribeMessage("salary:claim")
@@ -387,6 +544,11 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     user.salaryClaimCount = newCount;
     const nextCd = 5 * 60 * 1000 + newCount * 30 * 1000;
     client.emit("salary:claimed", { coins: newCoins, nextCooldownMs: nextCd });
+    void this.notificationsService.onSalaryClaimed(client, {
+      id: user.id,
+      lastSalaryAt: user.lastSalaryAt,
+      salaryClaimCount: user.salaryClaimCount,
+    });
   }
 
   @SubscribeMessage("user:ban")
@@ -463,7 +625,10 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           });
       }
       client.to(`room:${user.roomId}`).emit("user:leave", client.id);
-      client.to(`room:${user.roomId}`).emit("user:join", user);
+      if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
+        client.to(`room:${user.roomId}`).emit("user:join", user);
+      }
+      void this.emitRoomOnlineUpdate(user.roomId);
     }
   }
 
@@ -494,40 +659,34 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       weather,
     );
 
-    // Отправляем системное сообщение в чат
     const changes: string[] = [];
     if (backgroundType !== oldBackgroundType) {
-      const bgNames: Record<string, string> = {
-        grass: "Луг",
-        field: "Поле",
-        mountains: "Горы",
-        snow: "Зима",
-        beach: "Пляж",
-      };
-      changes.push(`фон на "${bgNames[backgroundType] || backgroundType}"`);
+      changes.push("background");
     }
     if (weather !== oldWeather) {
-      const weatherNames: Record<string, string> = {
-        clear: "Ясно",
-        rain: "Дождь",
-        snow: "Снег",
-      };
-      changes.push(`погоду на "${weatherNames[weather] || weather}"`);
+      changes.push("weather");
     }
 
     if (changes.length > 0) {
-      const message = `${user.nickname} сменил(а) ${changes.join(" и ")}`;
+      let message: string;
+      if (changes.length === 2) {
+        message = `changed background to ${backgroundType} and weather to ${weather}`;
+      } else if (changes[0] === "background") {
+        message = `changed background to ${backgroundType}`;
+      } else {
+        message = `changed weather to ${weather}`;
+      }
       await this.dbService.saveChatMessage({
         roomId: user.roomId,
         userId: null,
-        nickname: "",
+        nickname: user.nickname,
         text: message,
         gender: user.gender,
         isSystem: true,
       });
       this.server.to(`room:${user.roomId}`).emit("chat:message", {
         socketId: "__system__",
-        nickname: "",
+        nickname: user.nickname,
         text: message,
         timestamp: Date.now(),
         isSystem: true,
@@ -542,14 +701,20 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private async joinRoom(client: Socket, user: any, roomId: number) {
-    if (user.roomId) {
-      void client.leave(`room:${user.roomId}`);
-      void client.to(`room:${user.roomId}`).emit("user:leave", client.id);
+    const prevRoomId = user.roomId;
+    if (prevRoomId) {
+      void client.leave(`room:${prevRoomId}`);
+      if (!this.onlineUsersService.isAdminHidden(user, prevRoomId)) {
+        void client.to(`room:${prevRoomId}`).emit("user:leave", client.id);
+      }
     }
 
     user.roomId = roomId;
     user.x = 200 + Math.random() * 600;
     user.y = 0;
+    user.lastActiveAt = Date.now();
+    user.afk = false;
+    this.onlineUsersService.touchActivity(client.id);
 
     void client.join(`room:${roomId}`);
     if (!user.isGuest) {
@@ -558,15 +723,7 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const room = await this.dbService.getRoomById(roomId);
     const roomData = room
-      ? {
-          id: room.id,
-          name: room.name,
-          creatorId: room.creatorId,
-          maxUsers: room.maxUsers,
-          online: this.onlineUsersService.getByRoom(roomId).length,
-          backgroundType: room.backgroundType ?? "grass",
-          weather: room.weather ?? "clear",
-        }
+      ? this.mapRoomDto(room)
       : {
           id: roomId,
           name: "Room",
@@ -575,9 +732,16 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           online: 0,
           backgroundType: "grass" as const,
           weather: "clear" as const,
+          photoUrl: null,
         };
 
-    const usersInRoom = this.onlineUsersService.getByRoom(roomId);
+    const usersInRoom = this.onlineUsersService
+      .getByRoom(roomId)
+      .filter(
+        (u) =>
+          u.socketId === client.id ||
+          !this.onlineUsersService.isAdminHidden(u, roomId),
+      );
     const sellPercent = await this.dbService.getSettingNumber(
       "sell_percent",
       50,
@@ -604,7 +768,15 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       daily,
     });
 
-    if (!user.invisible) {
+    if (!user.isGuest) {
+      void this.notificationsService.syncUserNotifications(client, {
+        id: user.id,
+        lastSalaryAt: user.lastSalaryAt ?? 0,
+        salaryClaimCount: user.salaryClaimCount ?? 0,
+      });
+    }
+
+    if (!this.onlineUsersService.isAdminHidden(user, roomId)) {
       const joinMessage = "joined the room";
       await this.dbService.saveChatMessage({
         roomId,
@@ -625,7 +797,13 @@ export class RoomsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
     }
 
-    client.to(`room:${roomId}`).emit("user:join", user);
+    if (!this.onlineUsersService.isAdminHidden(user, roomId)) {
+      client.to(`room:${roomId}`).emit("user:join", user);
+    }
+    void this.emitRoomOnlineUpdate(roomId);
+    if (prevRoomId && prevRoomId !== roomId) {
+      void this.emitRoomOnlineUpdate(prevRoomId);
+    }
     void this.handleRoomList(client);
   }
 }
