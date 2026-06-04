@@ -1,4 +1,4 @@
-// Локальные определения типов для backend
+
 type CharacterType = "cat" | "dog" | "fox" | "panda" | "raccoon";
 
 interface RenderBox {
@@ -27,8 +27,8 @@ export interface ShopItemRaw {
 }
 
 const R = { x: -40, y: -74, w: 80, h: 120 };
-// const _BOTTOM_R = { x: -24, y: -2, w: 48, h: 40 }; // Currently unused but kept for consistency
-// const _HAT_R = { x: -28, y: -88, w: 56, h: 36 }; // Currently unused but kept for consistency
+
+
 const MASK_R = { x: -22, y: -64, w: 44, h: 38 };
 const CHAIN_R = { x: -24, y: -30, w: 48, h: 22 };
 const D = {
@@ -42,8 +42,8 @@ const D = {
 };
 
 const SHOP_ITEMS: ShopItemRaw[] = [
-  // ========== EFFECTS (Эффекты) ==========
-  // Common - базовые эффекты
+  
+  
   {
     id: "sparkle",
     name: "Sparkle",
@@ -102,7 +102,7 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "common",
   },
 
-  // Uncommon - средние эффекты
+  
   {
     id: "ghost",
     name: "Ghosts",
@@ -144,7 +144,7 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "uncommon",
   },
 
-  // Rare - редкие эффекты
+  
   {
     id: "ice",
     name: "Ice",
@@ -186,7 +186,7 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "rare",
   },
 
-  // Epic - эпические эффекты
+  
   {
     id: "orbit",
     name: "Orbit",
@@ -260,6 +260,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -45, y: -86, w: 96, h: 126 },
+      fox: { x: -43, y: -86, w: 90, h: 118 },
+      raccoon: { x: -55, y: -79, w: 96, h: 126 },
     },
     ...D,
     rarity: "common",
@@ -273,6 +275,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -19, y: 17, w: 43, h: 27 },
+      fox: { x: -20, y: 7, w: 40, h: 25 },
+      raccoon: { x: -29, y: 25, w: 43, h: 27 },
     },
     ...D,
     rarity: "common",
@@ -286,6 +290,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -42, y: -34, w: 90, h: 59 },
+      fox: { x: -39, y: -41, w: 84, h: 55 },
+      raccoon: { x: -45, y: -35, w: 76, h: 69 },
     },
     ...D,
     rarity: "common",
@@ -299,6 +305,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -37, y: -35, w: 77, h: 55 },
+      raccoon: { x: -45, y: -34, w: 73, h: 66 },
+      fox: { x: -36, y: -39, w: 73, h: 51 },
     },
     ...D,
     rarity: "common",
@@ -312,6 +320,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -25, y: -8, w: 54, h: 47 },
+      fox: { x: -25, y: -14, w: 51, h: 44 },
+      raccoon: { x: -35, y: 3, w: 54, h: 47 },
     },
     ...D,
     rarity: "common",
@@ -325,6 +335,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -35, y: -7, w: 74, h: 46 },
+      raccoon: { x: -41, y: 4, w: 65, h: 44 },
+      fox: { x: -34, y: -15, w: 69, h: 43 },
     },
     ...D,
     rarity: "common",
@@ -338,6 +350,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -23, y: 1, w: 48, h: 30 },
+      fox: { x: -22, y: -6, w: 45, h: 28 },
+      raccoon: { x: -32, y: 7, w: 48, h: 34 },
     },
     ...D,
     rarity: "common",
@@ -351,6 +365,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -20, y: 1, w: 44, h: 27 },
+      fox: { x: -22, y: -6, w: 45, h: 28 },
+      raccoon: { x: -32, y: 7, w: 48, h: 34 },
     },
     ...D,
     rarity: "common",
@@ -364,6 +380,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -20, y: 3, w: 46, h: 28 },
+      fox: { x: -20, y: -6, w: 43, h: 26 },
+      raccoon: { x: -29, y: 12, w: 46, h: 28 },
     },
     ...D,
     rarity: "common",
@@ -377,6 +395,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -34, y: -7, w: 76, h: 46 },
+      fox: { x: -33, y: -13, w: 71, h: 43 },
+      raccoon: { x: -42, y: -5, w: 71, h: 60 },
     },
     ...D,
     rarity: "common",
@@ -391,6 +411,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -48, y: 1, w: 107, h: 34 },
+      fox: { x: -46, y: -8, w: 100, h: 32 },
+      raccoon: { x: -57, y: 4, w: 107, h: 40 },
     },
     ...D,
     rarity: "common",
@@ -405,13 +427,15 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -50, y: -5, w: 115, h: 48 },
+      raccoon: { x: -59, y: -2, w: 115, h: 56 },
+      fox: { x: -47, y: -11, w: 107, h: 47 },
     },
     ...D,
     rarity: "common",
   },
 
-  // ========== HATS (Головные уборы) ==========
-  // Common
+  
+  
   {
     id: "beanie",
     name: "Beanie",
@@ -421,7 +445,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -28, y: -86, w: 56, h: 44 },
     renderByCharacter: {
       cat: { x: -29, y: -95, w: 60, h: 56 },
-      fox: { x: -24.5, y: -89, w: 50, h: 44 },
+      fox: { x: -27, y: -94, w: 56, h: 52 },
+      raccoon: { x: -38, y: -90, w: 60, h: 56 },
     },
     ...D,
     rarity: "common",
@@ -436,12 +461,13 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     renderByCharacter: {
       cat: { x: -20, y: -83, w: 39, h: 27 },
       fox: { x: -19, y: -77, w: 44, h: 27, rotate: 4 },
+      raccoon: { x: -30, y: -78, w: 44, h: 27, rotate: 4 },
     },
     ...D,
     rarity: "common",
   },
 
-  // Uncommon
+  
   {
     id: "red_horns",
     name: "Red Horns",
@@ -451,7 +477,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -28, y: -88, w: 56, h: 32 },
     renderByCharacter: {
       cat: { x: -25, y: -92, w: 51, h: 39 },
-      fox: { x: -19, y: -89, w: 39, h: 33 },
+      fox: { x: -24, y: -89, w: 48, h: 36 },
+      raccoon: { x: -34, y: -93, w: 51, h: 39 },
     },
     ...D,
     rarity: "uncommon",
@@ -465,7 +492,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -28, y: -88, w: 56, h: 32 },
     renderByCharacter: {
       cat: { x: -54, y: -88, w: 98, h: 51 },
-      fox: { x: -31, y: -78, w: 53, h: 28, rotate: -7 },
+      fox: { x: -50, y: -82, w: 91, h: 48 },
+      raccoon: { x: -60, y: -83, w: 98, h: 51 },
     },
     ...D,
     rarity: "uncommon",
@@ -477,13 +505,17 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     price: 600,
     svg: "/accessories/spacesuit.png",
     render: { x: -38, y: -71, w: 76, h: 65 },
-    renderByCharacter: { cat: { x: -35, y: -82, w: 71, h: 64 } },
+    renderByCharacter: {
+      cat: { x: -35, y: -82, w: 71, h: 64 },
+      raccoon: { x: -45, y: -79, w: 71, h: 64 },
+      fox: { x: -35, y: -84, w: 69, h: 60 },
+    },
     ...D,
     rarity: "epic",
   },
 
-  // ========== MASKS (Маски и цепи) ==========
-  // Common
+  
+  
   {
     id: "silver_chain",
     name: "Silver Chain",
@@ -494,12 +526,13 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     renderByCharacter: {
       cat: { x: -15, y: -25, w: 34, h: 15 },
       fox: { x: -13, y: -29, w: 26, h: 16 },
+      raccoon: { x: -24, y: -24, w: 34, h: 15 },
     },
     ...D,
     rarity: "common",
   },
 
-  // Uncommon
+  
   {
     id: "hockey_mask",
     name: "Hockey Mask",
@@ -509,6 +542,7 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     renderByCharacter: {
       cat: { x: -27, y: -68, w: 57, h: 49 },
       fox: { x: -19.5, y: -67, w: 40, h: 42 },
+      raccoon: { x: -43, y: -69, w: 69, h: 52 },
     },
     render: MASK_R,
     ...D,
@@ -524,12 +558,13 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     renderByCharacter: {
       cat: { x: -39, y: -73, w: 81, h: 53 },
       fox: { x: -30, y: -68, w: 61, h: 42 },
+      raccoon: { x: -51, y: -68, w: 89, h: 53 },
     },
     ...D,
     rarity: "uncommon",
   },
 
-  // Rare
+  
   {
     id: "gold_chain",
     name: "Gold Chain",
@@ -539,13 +574,14 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     renderByCharacter: {
       cat: { x: -15, y: -25, w: 34, h: 15 },
       fox: { x: -13, y: -29, w: 27, h: 15 },
+      raccoon: { x: -24, y: -22, w: 34, h: 15 },
     },
     render: CHAIN_R,
     ...D,
     rarity: "rare",
   },
 
-  // ========== ITEMS (Предметы в руке) ==========
+  
   {
     id: "sparkler_item",
     name: "Sparkler",
@@ -554,10 +590,13 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     svg: "/accessories/sparkler_item.svg",
     render: { x: 20, y: -28, w: 14, h: 26 },
     ...D,
+    renderByCharacter: {
+      raccoon: { x: 10, y: -10, w: 14, h: 26 },
+    },
     rarity: "common",
   },
 
-  // Rare
+  
   {
     id: "red_roses",
     name: "Red Roses",
@@ -566,15 +605,16 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     svg: "/accessories/red_roses.svg",
     render: { x: 16, y: -20, w: 30, h: 32 },
     renderByCharacter: {
-      cat: { x: 11, y: -34, w: 34, h: 37 },
+      cat: { x: 11, y: -34, w: 34, h: 37, rotate: 20 },
       fox: { x: 14, y: -31, w: 30, h: 32, rotate: 20 },
+      raccoon: { x: 2, y: -20, w: 34, h: 37, rotate: 20 },
     },
     ...D,
     rarity: "rare",
   },
 
-  // ========== VEHICLES (Транспорт) ==========
-  // Epic - премиум предметы
+  
+  
   {
     id: "mercedes_benz_c",
     name: "Mercedes-Benz C-Class",
@@ -582,7 +622,10 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     price: 1500,
     svg: "/accessories/mercedes_benz_c.png",
     render: { x: -33, y: -33, w: 120, h: 92, rotate: -1 },
-    renderByCharacter: {},
+    renderByCharacter: {
+      fox: { x: -33, y: -38, w: 120, h: 92, rotate: -1 },
+      raccoon: { x: -33, y: -26, w: 120, h: 92, rotate: -1 },
+    },
     ...D,
     rarity: "epic",
   },
@@ -593,13 +636,16 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     price: 1750,
     svg: "/accessories/bmw_3_series.png",
     render: { x: -33, y: -53, w: 113, h: 126, rotate: -3 },
-    renderByCharacter: {},
+    renderByCharacter: {
+      raccoon: { x: -33, y: -44, w: 113, h: 126, rotate: -3 },
+      fox: { x: -31, y: -53, w: 105, h: 118, rotate: -3 },
+    },
     ...D,
     rarity: "epic",
   },
 
-  // ========== TATTOOS (Татуировки) ==========
-  // Common
+  
+  
   {
     id: "symbols_tatoo",
     name: "Symbols Tattoo",
@@ -608,7 +654,9 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     svg: "/accessories/symbols_tatoo.png",
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
+      fox: { x: -21, y: -37, w: 45, h: 48 },
       cat: { x: -24, y: -34, w: 48, h: 51 },
+      raccoon: { x: -31, y: -29, w: 48, h: 51 },
     },
     ...D,
     rarity: "common",
@@ -623,9 +671,9 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     renderByCharacter: {
       cat: { x: 5, y: -41, w: 20, h: 16 },
       dog: { x: -30, y: -40, w: 60, h: 60 },
-      fox: { x: -30, y: -40, w: 60, h: 60 },
-      panda: { x: -30, y: -40, w: 60, h: 60 },
-      raccoon: { x: -30, y: -40, w: 60, h: 60 },
+      fox: { x: -14, y: -67, w: 19, h: 15 },
+
+      raccoon: { x: -35, y: -43, w: 20, h: 16 },
     },
     ...D,
     rarity: "common",
@@ -639,6 +687,8 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -7, y: -9, w: 32, h: 27 },
+      raccoon: { x: -24, y: 3, w: 32, h: 27 },
+      fox: { x: -6, y: -11, w: 30, h: 25 },
     },
     ...D,
     rarity: "common",
@@ -652,13 +702,15 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     render: { x: -30, y: -40, w: 60, h: 60 },
     renderByCharacter: {
       cat: { x: -15, y: -20, w: 25, h: 29 },
+      fox: { x: -14, y: -12, w: 23, h: 27 },
+      raccoon: { x: -24, y: -15, w: 23, h: 27 },
     },
     ...D,
     rarity: "common",
   },
 
-  // ========== GLASSES (Очки) ==========
-  // Common
+  
+  
 ];
 
 const SHOP_ITEMS_MAP = new Map(SHOP_ITEMS.map((i) => [i.id, i]));
@@ -704,7 +756,7 @@ export function getShopItemsForClient(): (ShopItemRaw & {
   const isDev = process.env.NODE_ENV === "development";
   return getActiveShopItems().map((item) => {
     const withPrice = applyEffectivePrice(item);
-    // В development режиме все предметы доступны для всех
+    
     if (isDev) {
       return { ...withPrice, genderFilter: "all" as const };
     }

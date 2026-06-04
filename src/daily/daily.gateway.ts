@@ -36,10 +36,16 @@ export class DailyGateway {
 
     const result = await this.dailyService.claimStreak(user.id);
     if (result) {
+      user.coins = result.coins;
+      if (result.badges) user.badges = result.badges;
       client.emit("daily:streakClaimed", {
         coins: result.coins,
         streakDays: result.streakDays,
+        badges: result.badges,
       });
+      if (result.streakDays >= 7 && result.badges) {
+        client.emit("badges:updated", { badges: result.badges });
+      }
     }
   }
 

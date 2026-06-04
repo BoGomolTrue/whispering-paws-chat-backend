@@ -112,52 +112,59 @@ export class ShopGateway {
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.isGuest || !data?.toUserId || !data?.itemId) return;
     if (data.toUserId === user.id) return;
-    const itemId = data.itemId;
-    if (!user.ownedItems.includes(itemId)) {
-      client.emit("shop:error", "Item not owned");
-      return;
-    }
+
     const recipient = this.onlineUsersService.getById(data.toUserId);
     if (!recipient) {
       client.emit("shop:error", "User not online");
       return;
     }
-    const item = this.shopService.getItemFromCache(itemId);
-    if (!item) return;
-    if (recipient.ownedItems.includes(itemId)) {
-      client.emit("shop:error", "User already has this item");
-      return;
-    }
+
     try {
-      if (user.equipped[item.category] === itemId) {
-        user.equipped[item.category] = null;
-        user.equippedColors[item.category] = null;
-        await this.shopService.equipItem(user.id, item.category, null, null);
-      }
-      user.ownedItems = user.ownedItems.filter((id) => id !== itemId);
-      user.inventoryValue = this.shopService.calcInventoryValue(user.ownedItems);
-      await this.shopService.transferItem(user.id, data.toUserId, itemId);
-      recipient.ownedItems.push(itemId);
+      const result = await this.shopService.giftPurchase(
+        user.id,
+        data.toUserId,
+        data.itemId,
+      );
+      user.coins = result.coins;
+
       recipient.inventoryValue = this.shopService.calcInventoryValue(
         recipient.ownedItems,
       );
+
       const recipientSock = this.server.sockets.sockets.get(recipient.socketId);
       if (recipientSock) {
         recipientSock.emit("gift:received", {
           fromNickname: user.nickname,
-          itemId,
-          itemName: item.name ?? itemId,
+          itemId: result.itemId,
+          itemName: result.itemName,
           ownedItems: recipient.ownedItems,
           inventoryValue: recipient.inventoryValue,
         });
         void this.notificationsService.onGiftReceived(recipientSock, data.toUserId, {
           fromNickname: user.nickname,
-          itemId,
-          itemName: item.name ?? itemId,
+          itemId: result.itemId,
+          itemName: result.itemName,
           fromUserId: user.id,
         });
       }
-      client.emit("gift:sent", { toUserId: data.toUserId, itemId });
+
+      client.emit("gift:sent", {
+        toUserId: data.toUserId,
+        itemId: result.itemId,
+        coins: result.coins,
+      });
+
+      if (user.roomId) {
+        const giftText = `gifted ${recipient.nickname}: ${result.itemName}`;
+        this.server.to(`room:${user.roomId}`).emit("chat:message", {
+          msgId: Date.now(),
+          socketId: "__system__",
+          nickname: user.nickname,
+          text: giftText,
+          timestamp: Date.now(),
+          gender: user.gender,
+        });
+      }
     } catch (e) {
       client.emit("shop:error", e instanceof Error ? e.message : "Error");
     }

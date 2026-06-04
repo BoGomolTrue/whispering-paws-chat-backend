@@ -5,7 +5,7 @@ import { BotsService } from "../bots/bots.service";
 import { OnlineUsersService } from "../common/services/online-users.service";
 import { DatabaseService } from "../database/database.service";
 
-// Простая заглушка для персонажей, так как полный промпт очень большой
+
 const PERSONALITIES: Record<
   string,
   { age: number; desc: string; interests: string; style: string }
@@ -74,8 +74,8 @@ export class AiService {
       const response = await this.callAI(systemPrompt, context);
       if (!response) continue;
 
-      // Здесь должна быть логика отправки ответа через Gateway
-      // Для краткости опущена реализация эмита, так как требует доступа к сокету
+      
+      
       this.logger.debug(
         `AI Response from ${bot.nickname}: ${response.substring(0, 50)}...`,
       );
@@ -113,7 +113,7 @@ export class AiService {
     if (!response) return;
 
     await this.dbService.saveDirectMessage(toBotId, fromUserId, response);
-    // Эмит через Gateway
+    
   }
 
   private canRespond(botSid: string): boolean {

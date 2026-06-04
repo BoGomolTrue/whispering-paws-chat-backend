@@ -177,6 +177,8 @@ export class RoomsGateway
         anketa_looking_for: raw.anketa_looking_for,
         anketa_age: raw.anketa_age,
         anketa_avatar: raw.anketa_avatar,
+        badges: Array.isArray(raw.badges) ? raw.badges : [],
+        starterQuestStep: raw.starterQuestStep ?? 0,
         lastActiveAt: Date.now(),
         afk: false,
       };
@@ -463,7 +465,7 @@ export class RoomsGateway
       });
     }
 
-    // Отправляем системное сообщение в чат о смене эмоции
+    
     const emotionNames: Record<string, string> = {
       neutral: "спокоен",
       happy: "радуется",
@@ -578,7 +580,7 @@ export class RoomsGateway
     user.invisible = next;
     client.emit("user:invisibleChanged", { invisible: next });
     if (user.roomId) {
-      // Если включаем невидимку — отправляем сообщение о выходе
+      
       if (next) {
         const leaveMessage = "left";
         void this.dbService
@@ -601,7 +603,7 @@ export class RoomsGateway
             });
           });
       } else {
-        // Если выключаем невидимку — отправляем сообщение о входе
+        
         const joinMessage = "joined the room";
 
         void this.dbService
@@ -640,7 +642,7 @@ export class RoomsGateway
     const user = this.onlineUsersService.get(client.id);
     if (!user || !user.roomId) return;
 
-    // Только админ или создатель комнаты может менять фон
+    
     const room = await this.dbService.getRoomById(user.roomId);
     if (!room) return;
 
@@ -693,7 +695,7 @@ export class RoomsGateway
       });
     }
 
-    // Уведомляем всех в комнате (включая инициатора) об изменении фона
+    
     this.server.in(`room:${user.roomId}`).emit("room:backgroundChanged", {
       backgroundType,
       weather,
@@ -755,6 +757,11 @@ export class RoomsGateway
     const daily = user.isGuest
       ? null
       : await this.dbService.getDailyState(user.id);
+
+    if (!user.isGuest) {
+      const step = await this.dbService.onStarterQuestJoined(user.id);
+      user.starterQuestStep = step;
+    }
 
     client.emit("room:joined", {
       room: roomData,

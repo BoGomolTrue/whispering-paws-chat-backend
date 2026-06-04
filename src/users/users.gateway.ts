@@ -131,7 +131,7 @@ export class UsersGateway {
             avatar: user.anketa_avatar,
           },
         });
-        // Отправляем системное сообщение в чат с ссылкой на анкету
+        
         const text = `edited_anketa [anketa:${user.id}]`;
         await this.dbService.saveChatMessage({
           roomId: user.roomId,
@@ -182,6 +182,24 @@ export class UsersGateway {
       client.emit(
         "profile:error",
         err instanceof Error ? err.message : "Password change failed",
+      );
+    }
+  }
+
+  @SubscribeMessage("referrals:get")
+  async handleReferralsGet(@ConnectedSocket() client: Socket) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest) {
+      client.emit("referrals:error", "Guests cannot view referrals");
+      return;
+    }
+    try {
+      const stats = await this.dbService.getReferralStats(user.id);
+      client.emit("referrals:data", stats);
+    } catch (err) {
+      client.emit(
+        "referrals:error",
+        err instanceof Error ? err.message : "Failed to load referrals",
       );
     }
   }

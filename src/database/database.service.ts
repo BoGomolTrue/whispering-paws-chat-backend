@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
+import { randomBytes } from "crypto";
 import {
   DAILY_QUESTS,
   getQuestProgress,
@@ -16,6 +17,7 @@ import { UserEquipped } from "./models/user-equipped.model";
 import { UserItem } from "./models/user-item.model";
 import { User } from "./models/user.model";
 import { Notification } from "./models/notification.model";
+import { STARTER_QUEST_REWARD } from "../achievements/achievements.config";
 
 export interface DbUserRow {
   id: number;
@@ -47,6 +49,11 @@ export interface DbUserRow {
   anketa_looking_for?: string | null;
   anketa_age?: string | null;
   anketa_avatar?: string | null;
+  referralCode?: string | null;
+  referredBy?: number | null;
+  referralBonusPaid?: boolean;
+  badges?: string[];
+  starterQuestStep?: number;
 }
 
 @Injectable()
@@ -76,7 +83,7 @@ export class DatabaseService implements OnModuleInit {
     await this.ensureGuestRoom();
   }
 
-  // === USER ===
+  
   async loadUserForSocket(userId: number): Promise<DbUserRow | null> {
     const user = await this.userRepository.findByPk(userId, {
       include: [
@@ -140,7 +147,62 @@ export class DatabaseService implements OnModuleInit {
       anketa_looking_for: u.anketa_looking_for,
       anketa_age: u.anketa_age,
       anketa_avatar: u.anketa_avatar,
+      badges: Array.isArray(u.badges) ? u.badges : [],
+      starterQuestStep: u.starterQuestStep ?? 0,
     };
+  }
+
+  parseBadges(raw: unknown): string[] {
+    if (Array.isArray(raw)) return raw.filter((x) => typeof x === "string");
+    return [];
+  }
+
+  async getUserBadges(userId: number): Promise<string[]> {
+    const row = await this.userRepository.findByPk(userId, {
+      attributes: ["badges"],
+      raw: true,
+    });
+    if (!row) return [];
+    return this.parseBadges((row as any).badges);
+  }
+
+  async grantBadge(userId: number, badgeId: string): Promise<string[] | null> {
+    const badges = await this.getUserBadges(userId);
+    if (badges.includes(badgeId)) return null;
+    const next = [...badges, badgeId];
+    await this.userRepository.update({ badges: next }, { where: { id: userId } });
+    return next;
+  }
+
+  async onStarterQuestJoined(userId: number): Promise<number> {
+    const row = await this.userRepository.findByPk(userId, {
+      attributes: ["starterQuestStep"],
+      raw: true,
+    });
+    const step = (row as any)?.starterQuestStep ?? 0;
+    if (!row || step >= 1) return step;
+    await this.userRepository.update({ starterQuestStep: 1 }, { where: { id: userId } });
+    return 1;
+  }
+
+  async onStarterQuestFirstMessage(
+    userId: number,
+  ): Promise<{ step: number; coins: number; badges: string[] } | null> {
+    const row = await this.userRepository.findByPk(userId, {
+      attributes: ["starterQuestStep", "coins"],
+      raw: true,
+    });
+    if (!row || (row as any).starterQuestStep !== 1) return null;
+    const newCoins = ((row as any).coins ?? 0) + STARTER_QUEST_REWARD;
+    let badges = await this.getUserBadges(userId);
+    if (!badges.includes("first_message")) {
+      badges = [...badges, "first_message"];
+    }
+    await this.userRepository.update(
+      { starterQuestStep: 3, coins: newCoins, badges },
+      { where: { id: userId } },
+    );
+    return { step: 3, coins: newCoins, badges };
   }
 
   async findUserByVkId(vkId: number): Promise<User | null> {
@@ -169,6 +231,7 @@ export class DatabaseService implements OnModuleInit {
     telegramId?: string;
   }): Promise<User> {
     const startingCoins = await this.getSettingNumber("starting_coins", 100);
+    const referralCode = randomBytes(5).toString('hex').toUpperCase();
     return this.userRepository.create({
       email: data.email,
       password: data.password,
@@ -178,6 +241,7 @@ export class DatabaseService implements OnModuleInit {
       coins: startingCoins,
       vkId: data.vkId ?? null,
       telegramId: data.telegramId ?? null,
+      referralCode,
     } as any);
   }
 
@@ -241,7 +305,7 @@ export class DatabaseService implements OnModuleInit {
     });
   }
 
-  // === ITEMS ===
+  
   async addOwnedItem(userId: number, itemId: string): Promise<void> {
     await this.userItemRepository.findOrCreate({ where: { userId, itemId } });
   }
@@ -268,7 +332,7 @@ export class DatabaseService implements OnModuleInit {
     await this.userEquippedRepository.destroy({ where: { userId, category } });
   }
 
-  // === ROOMS ===
+  
   async createRoom(
     name: string,
     creatorId: number,
@@ -342,7 +406,7 @@ export class DatabaseService implements OnModuleInit {
     return room ? room.id : (await this.ensureGuestRoom()).id;
   }
 
-  // === CHAT ===
+  
   async saveChatMessage(data: {
     roomId: number;
     userId: number | null;
@@ -443,7 +507,7 @@ export class DatabaseService implements OnModuleInit {
     return msg ? (msg as any).fromUserId : null;
   }
 
-  // === SETTINGS ===
+  
   async seedSettings(): Promise<void> {
     const defaults = [
       {
@@ -499,7 +563,7 @@ export class DatabaseService implements OnModuleInit {
     return this.settingRepository.findAll({ raw: true });
   }
 
-  // === RANKS ===
+  
   async seedRanks(): Promise<void> {
     const ranks = [
       { min: 0, name: "Newbie" },
@@ -537,7 +601,7 @@ export class DatabaseService implements OnModuleInit {
     return this.rankRepository.findAll({ order: [["min", "ASC"]], raw: true });
   }
 
-  // === DAILY QUESTS ===
+  
   private getTodayUtc(): string {
     return new Date().toISOString().slice(0, 10);
   }
@@ -638,7 +702,7 @@ export class DatabaseService implements OnModuleInit {
 
   async claimStreak(
     userId: number,
-  ): Promise<{ coins: number; streakDays: number } | null> {
+  ): Promise<{ coins: number; streakDays: number; badges: string[] } | null> {
     const today = this.getTodayUtc();
     const row = await this.userRepository.findByPk(userId, {
       attributes: ["streak_last_date", "streak_days", "coins"],
@@ -670,7 +734,29 @@ export class DatabaseService implements OnModuleInit {
       { where: { id: userId } },
     );
 
-    return { coins: (row as any).coins + coins, streakDays };
+    let badges: string[] | null = null;
+    if (streakDays >= 7) {
+      badges = await this.grantBadge(userId, "streak_7");
+    }
+
+    return {
+      coins: (row as any).coins + coins,
+      streakDays,
+      badges: badges ?? (await this.getUserBadges(userId)),
+    };
+  }
+
+  async hasIncomingDm(fromUserId: number, toUserId: number): Promise<boolean> {
+    const count = await this.directMessageRepository.count({
+      where: { fromUserId, toUserId },
+    });
+    return count > 0;
+  }
+
+  async countUserChatMessages(userId: number): Promise<number> {
+    return this.chatMessageRepository.count({
+      where: { userId, isSystem: false },
+    });
   }
 
   async claimQuestReward(
@@ -787,5 +873,53 @@ export class DatabaseService implements OnModuleInit {
       { read: true },
       { where: { userId, type, read: false } },
     );
+  }
+
+  
+  async getReferralStats(userId: number): Promise<{ code: string | null; referredCount: number }> {
+    const user = await this.userRepository.findByPk(userId, { raw: true });
+    if (!user) return { code: null, referredCount: 0 };
+
+    const referrals = await this.userRepository.count({
+      where: { referredBy: userId },
+    });
+
+    return {
+      code: user.referralCode,
+      referredCount: referrals,
+    };
+  }
+
+  async applyReferralCode(
+    newUserId: number,
+    referralCode: string,
+    onlineUsersService?: any,
+  ): Promise<void> {
+    const referrer = await this.userRepository.findOne({
+      where: { referralCode },
+      raw: true,
+    });
+
+    if (!referrer) return;
+
+    await this.userRepository.update(
+      { referredBy: referrer.id },
+      { where: { id: newUserId } },
+    );
+
+    const newCoins = referrer.coins + 500;
+    await this.updateUserCoins(referrer.id, newCoins);
+
+    if (onlineUsersService) {
+      try {
+        onlineUsersService.updateCoins(referrer.id, newCoins);
+      } catch (err) {
+        this.logger.warn(`Failed to update online user coins: ${err}`);
+      }
+    }
+  }
+
+  async findUserById(userId: number): Promise<User | null> {
+    return this.userRepository.findByPk(userId);
   }
 }

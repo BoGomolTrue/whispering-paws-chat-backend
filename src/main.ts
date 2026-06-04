@@ -1,4 +1,4 @@
-import { ValidationPipe } from "@nestjs/common";
+import { Logger, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { SocketIoAdapter } from "./socket-io.adapter";
@@ -24,10 +24,8 @@ async function bootstrap() {
   const host = configService.get<string>("HOST") || "0.0.0.0";
   const listenHost = host === "localhost" ? "0.0.0.0" : host;
 
-  // Настройка WebSocket адаптера
   app.useWebSocketAdapter(new SocketIoAdapter(app));
 
-  // Статика для uploads (до CORS, чтобы файлы отдавались корректно)
   const httpAdapter = app.getHttpAdapter();
   const expressApp = httpAdapter.getInstance();
   expressApp.use(
@@ -39,7 +37,6 @@ async function bootstrap() {
     }),
   );
 
-  // CORS настройки
   const allowedOrigins = [
     "https://prod-app.vk-apps.com",
     "https://dev.vk.com",
@@ -66,7 +63,6 @@ async function bootstrap() {
     allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   });
 
-  // Глобальная валидация
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
@@ -79,7 +75,7 @@ async function bootstrap() {
   );
 
   await app.listen(port, listenHost);
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
+  Logger.log(`Application is running on: http://localhost:${port}`, "Bootstrap");
 }
 
 void bootstrap();

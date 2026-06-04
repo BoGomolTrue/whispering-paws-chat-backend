@@ -32,6 +32,8 @@ export interface OnlineUser {
   anketa_looking_for?: string | null;
   anketa_age?: string | null;
   anketa_avatar?: string | null;
+  badges?: string[];
+  starterQuestStep?: number;
   isBot?: boolean;
   lastActiveAt: number;
   afk?: boolean;
@@ -97,11 +99,11 @@ export class OnlineUsersService {
   }
 
   async add(socketId: string, user: OnlineUser): Promise<void> {
-    // Ждём, если есть активная блокировка для этого пользователя
+    
     const lock = this.userLocks.get(user.id);
     if (lock) await lock;
 
-    // Создаём новую блокировку
+    
     const lockPromise = (async () => {
       const existing = Array.from(this.users.entries()).find(
         ([, u]) => u.id === user.id && !u.isBot,
@@ -175,12 +177,8 @@ export class OnlineUsersService {
     }
   }
 
-  isAdminHidden(user: OnlineUser | undefined, roomId: number): boolean {
-    return !!(
-      user &&
-      user.role === "admin" &&
-      (user.invisible || roomId !== 1)
-    ); // Assuming 1 is default room
+  isAdminHidden(user: OnlineUser | undefined, _roomId: number): boolean {
+    return !!(user && user.role === "admin" && user.invisible);
   }
 
   clear(): void {

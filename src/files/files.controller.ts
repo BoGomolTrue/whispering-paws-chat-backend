@@ -7,8 +7,8 @@ import {
   UnsupportedMediaTypeException,
 } from "@nestjs/common";
 import { FilesService } from "./files.service";
-// Для простоты пока без гарда, так как загрузка часто идет через FormData в браузере с куками
-// В реальном проекте лучше создать HttpJwtGuard на основе passport-jwt
+
+
 
 @Controller("api/upload")
 export class FilesController {
@@ -16,8 +16,8 @@ export class FilesController {
 
   @Post("avatar")
   async uploadAvatar(@Body() body: { dataUrl?: string; userId?: number }) {
-    // В реальном приложении userId берется из токена (AuthGuard)
-    // Здесь принимаем временно из тела или требует доработки гарда для HTTP
+    
+    
     if (!body.dataUrl) throw new BadRequestException("No image data");
 
     try {

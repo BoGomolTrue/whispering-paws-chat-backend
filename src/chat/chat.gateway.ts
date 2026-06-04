@@ -7,6 +7,7 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { STARTER_QUEST_REWARD } from "../achievements/achievements.config";
 import { AiService } from "../ai/ai.service";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
 import { OnlineUsersService } from "../common/services/online-users.service";
@@ -51,7 +52,7 @@ export class ChatGateway {
     this.onlineUsersService.touchActivity(client.id);
     const text = msg.text.trim().substring(0, 500);
 
-    // Save message
+    
     const saved = await this.dbService.saveChatMessage({
       roomId: user.roomId,
       userId: user.isGuest ? null : user.id,
@@ -61,7 +62,27 @@ export class ChatGateway {
       isSystem: false,
     });
 
-    // Emit to room
+    if (!user.isGuest) {
+      void this.dbService.incDailyMessages(user.id).catch(() => {});
+      const quest = await this.dbService.onStarterQuestFirstMessage(user.id);
+      if (quest) {
+        user.coins = quest.coins;
+        user.badges = quest.badges;
+        user.starterQuestStep = quest.step;
+        client.emit("starterQuest:complete", { coins: quest.coins, reward: STARTER_QUEST_REWARD });
+        client.emit("badges:updated", { badges: quest.badges });
+      } else {
+        const count = await this.dbService.countUserChatMessages(user.id);
+        if (count >= 10) {
+          const badges = await this.dbService.grantBadge(user.id, "messages_10");
+          if (badges) {
+            user.badges = badges;
+            client.emit("badges:updated", { badges });
+          }
+        }
+      }
+    }
+
     this.server.to(`room:${user.roomId}`).emit("chat:message", {
       msgId: saved.id,
       socketId: client.id,
@@ -70,11 +91,8 @@ export class ChatGateway {
       text,
       timestamp: Date.now(),
       gender: user.gender,
+      badges: user.badges ?? [],
     });
-
-    if (!user.isGuest) {
-      void this.dbService.incDailyMessages(user.id).catch(() => {});
-    }
 
     void this.aiService.handleChatMessage(
       client.id,
@@ -219,6 +237,7 @@ export class ChatGateway {
     }
     const text = (data.text ?? "").trim().substring(0, 500);
     if (!text) return;
+    const hadIncoming = await this.dbService.hasIncomingDm(data.toUserId, user.id);
     const saved = await this.dbService.saveDirectMessage(
       user.id,
       data.toUserId,
@@ -237,6 +256,19 @@ export class ChatGateway {
     if (recipient && !recipient.isGuest) {
       const sock = this.server.sockets.sockets.get(recipient.socketId);
       if (sock) sock.emit("dm:message", msg);
+    }
+    if (hadIncoming) {
+      const senderBadges = await this.dbService.grantBadge(user.id, "first_friend");
+      if (senderBadges) {
+        user.badges = senderBadges;
+        client.emit("badges:updated", { badges: senderBadges });
+      }
+      const partnerBadges = await this.dbService.grantBadge(data.toUserId, "first_friend");
+      if (partnerBadges && recipient) {
+        recipient.badges = partnerBadges;
+        const partnerSock = this.server.sockets.sockets.get(recipient.socketId);
+        if (partnerSock) partnerSock.emit("badges:updated", { badges: partnerBadges });
+      }
     }
     const fromLast = await this.dbService.getLastDmFrom(data.toUserId);
     if (fromLast === user.id && recipient && !recipient.isGuest) {

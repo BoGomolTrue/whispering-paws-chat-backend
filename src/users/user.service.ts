@@ -12,7 +12,7 @@ export class UsersService {
 
   async updateProfile(userId: number, updates: any) {
     await this.dbService.updateUserProfile(userId, updates);
-    // Обновляем данные в памяти если пользователь онлайн
+    
     const user = this.onlineUsersService.getById(userId);
     if (user) {
       Object.assign(user, updates);
@@ -20,8 +20,8 @@ export class UsersService {
   }
 
   async changePassword(userId: number, oldPass: string, newPass: string) {
-    // Логика проверки пароля должна быть в AuthModule или здесь с доступом к хешу
-    // Для краткости опущена, так как требует доступа к сырому хешу из БД
+    
+    
     const user = await this.dbService.getUserById(userId);
     if (!user || !user.password) throw new Error("User not found");
 

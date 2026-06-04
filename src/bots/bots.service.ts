@@ -18,7 +18,7 @@ export class BotsService implements OnModuleInit, OnModuleDestroy {
     | ((participants: BotInstance[]) => Promise<void>)
     | null = null;
 
-  // Константы
+  
   private readonly DIALOGUE_PAUSE_MIN = 300000;
   private readonly DIALOGUE_PAUSE_MAX = 900000;
   private readonly MOVE_INTERVAL_MIN = 20000;
@@ -93,7 +93,7 @@ export class BotsService implements OnModuleInit, OnModuleDestroy {
         ...profile,
         x: 100 + Math.random() * 900,
         y: 0,
-        roomId: 1, // Default room ID, should be dynamic later
+        roomId: 1, 
       };
       this.bots.set(bot.socketId, bot);
     }

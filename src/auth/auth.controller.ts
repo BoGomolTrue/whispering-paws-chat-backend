@@ -38,7 +38,7 @@ export class AuthController {
 
   @Get("me")
   async me(@Req() req: Request, @Res() res: Response) {
-    // Пробуем получить токен из Authorization header или cookies
+    
     const authHeader = req.headers.authorization;
     let token: string | undefined;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -140,6 +140,11 @@ export class AuthController {
       characterType: dto.characterType,
       gender: dto.gender,
     });
+
+    if (dto.referralCode) {
+      await this.dbService.applyReferralCode(newUser.id, dto.referralCode);
+    }
+
     const token = this.authService.signToken(newUser.id);
     setTokenCookie(res, token);
     return res.json({
@@ -225,6 +230,10 @@ export class AuthController {
         vkId,
       });
       await this.dbService.addOwnedItem(user.id, "sparkle");
+
+      if (body.signParams?.referralCode) {
+        await this.dbService.applyReferralCode(user.id, String(body.signParams.referralCode));
+      }
     }
     const plain = user.get({ plain: true }) as {
       banned: boolean;
@@ -308,6 +317,11 @@ export class AuthController {
         telegramId,
       });
       await this.dbService.addOwnedItem(user.id, "sparkle");
+
+      const referralCode = params.get("referralCode");
+      if (referralCode) {
+        await this.dbService.applyReferralCode(user.id, referralCode);
+      }
     }
     const plain = user.get({ plain: true }) as {
       banned: boolean;

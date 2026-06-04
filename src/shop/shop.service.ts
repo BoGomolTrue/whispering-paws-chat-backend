@@ -67,7 +67,7 @@ export class ShopService {
     );
     const refund = Math.round((item.price * sellPercent) / 100);
 
-    // Unequip if equipped
+    
     if (user.equipped[item.category] === itemId) {
       user.equipped[item.category] = null;
       user.equippedColors[item.category] = null;
@@ -121,5 +121,38 @@ export class ShopService {
   ): Promise<void> {
     await this.dbService.removeOwnedItem(fromUserId, itemId);
     await this.dbService.addOwnedItem(toUserId, itemId);
+  }
+
+  async giftPurchase(fromUserId: number, toUserId: number, itemId: string) {
+    const sender = this.onlineUsersService.getById(fromUserId);
+    const recipient = this.onlineUsersService.getById(toUserId);
+    if (!sender) throw new Error("User not online");
+    if (!recipient) throw new Error("User not online");
+    if (recipient.isGuest) throw new Error("Cannot gift to guests");
+
+    const item = this.getItemFromCache(itemId);
+    if (!item) throw new Error("Item not found");
+    if (!item.isActive) throw new Error("Item not available");
+    if (recipient.ownedItems.includes(itemId)) {
+      throw new Error("User already has this item");
+    }
+
+    const price = item.effectivePrice ?? item.price;
+    if (sender.coins < price) throw new Error("Not enough coins");
+
+    sender.coins -= price;
+    recipient.ownedItems.push(itemId);
+    recipient.inventoryValue = this.calcInventoryValue(recipient.ownedItems);
+
+    await this.dbService.updateUserCoins(fromUserId, sender.coins);
+    await this.dbService.addTotalSpent(fromUserId, price);
+    await this.dbService.addOwnedItem(toUserId, itemId);
+    await this.dbService.incDailyBought(fromUserId);
+
+    return {
+      coins: sender.coins,
+      itemId,
+      itemName: item.name ?? itemId,
+    };
   }
 }

@@ -28,6 +28,10 @@ export class RegisterDto extends LoginDto {
   @IsOptional()
   @IsString()
   gender?: string;
+
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 }
 
 export class GuestLoginDto {

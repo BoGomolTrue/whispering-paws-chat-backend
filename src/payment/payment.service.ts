@@ -75,6 +75,18 @@ export class PaymentService {
       await this.dbService.updateUserCoins(user.id, newCoins);
       this.creditCoinsToOnlineUser(user.id, newCoins);
 
+      if (user.referredBy && !user.referralBonusPaid) {
+        const bonus = Math.floor(pkg.coins * 0.1);
+        const referrer = await this.dbService.findUserById(user.referredBy);
+        if (referrer) {
+          const referrerNewCoins = referrer.coins + bonus;
+          await this.dbService.updateUserCoins(referrer.id, referrerNewCoins);
+          this.creditCoinsToOnlineUser(referrer.id, referrerNewCoins);
+          this.logger.log(`VK Pay referral bonus: +${bonus} coins → ${referrer.nickname}`);
+        }
+        await user.update({ referralBonusPaid: true });
+      }
+
       this.logger.log(`VK Pay: +${pkg.coins} coins → ${user.nickname}`);
 
       return { response: { order_id: orderId, app_order_id: orderId } };
@@ -137,6 +149,21 @@ export class PaymentService {
     const newCoins = user.coins + pkg.coins;
     await this.dbService.updateUserCoins(userId, newCoins);
     this.creditCoinsToOnlineUser(userId, newCoins);
+
+    if (user.referredBy && !user.referralBonusPaid) {
+      const bonus = Math.floor(pkg.coins * 0.1);
+      const referrer = await this.dbService.findUserById(user.referredBy);
+      if (referrer) {
+        const referrerNewCoins = referrer.coins + bonus;
+        await this.dbService.updateUserCoins(referrer.id, referrerNewCoins);
+        this.creditCoinsToOnlineUser(referrer.id, referrerNewCoins);
+        this.logger.log(`YooMoney referral bonus: +${bonus} coins → ${referrer.nickname}`);
+      }
+      const userRecord = await this.dbService.findUserById(userId);
+      if (userRecord) {
+        await userRecord.update({ referralBonusPaid: true });
+      }
+    }
 
     this.logger.log(`YooMoney: +${pkg.coins} coins → ${user.nickname}`);
   }
@@ -263,6 +290,21 @@ export class PaymentService {
       await this.dbService.updateUserCoins(userId, newCoins);
       this.creditCoinsToOnlineUser(userId, newCoins);
 
+      if (user.referredBy && !user.referralBonusPaid) {
+        const bonus = Math.floor(pkg.coins * 0.1);
+        const referrer = await this.dbService.findUserById(user.referredBy);
+        if (referrer) {
+          const referrerNewCoins = referrer.coins + bonus;
+          await this.dbService.updateUserCoins(referrer.id, referrerNewCoins);
+          this.creditCoinsToOnlineUser(referrer.id, referrerNewCoins);
+          this.logger.log(`TG Stars referral bonus: +${bonus} coins → ${referrer.nickname}`);
+        }
+        const userRecord = await this.dbService.findUserById(userId);
+        if (userRecord) {
+          await userRecord.update({ referralBonusPaid: true });
+        }
+      }
+
       this.logger.log(`TG Stars: +${pkg.coins} coins → ${user.nickname}`);
     }
   }
@@ -271,10 +313,10 @@ export class PaymentService {
     const user = this.onlineUsersService.getById(userId);
     if (user) {
       user.coins = coins;
-      // Note: We need access to the socket to emit.
-      // In a real scenario, OnlineUsersService should hold socket references or we use an event emitter.
-      // For now, assuming OnlineUsersService can handle emission or we skip direct emit here and rely on polling/client sync.
-      // To fix properly: OnlineUsersService needs `getSocket(userId)` method which returns the Socket instance.
+      
+      
+      
+      
     }
   }
 }

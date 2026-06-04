@@ -161,6 +161,30 @@ export class User extends Model<User> {
   @Column(DataType.BOOLEAN)
   tutorialCompleted: boolean;
 
+  @Default(null)
+  @Unique
+  @Column(DataType.STRING(10))
+  referralCode: string | null;
+
+  @Default(null)
+  @Column(DataType.INTEGER)
+  referredBy: number | null;
+
+  @Default(false)
+  @AllowNull(false)
+  @Column(DataType.BOOLEAN)
+  referralBonusPaid: boolean;
+
+  @Default([])
+  @AllowNull(false)
+  @Column(DataType.JSON)
+  badges: string[];
+
+  @Default(0)
+  @AllowNull(false)
+  @Column(DataType.INTEGER)
+  starterQuestStep: number;
+
   @HasMany(() => UserItem)
   items: UserItem[];
 
