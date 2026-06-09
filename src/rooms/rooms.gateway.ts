@@ -631,7 +631,9 @@ export class RoomsGateway
       client.emit("salary:wait", { remainMs: remain });
       return;
     }
-    const amount = await this.dbService.getSettingNumber("salary_amount", 10);
+    const baseAmount = await this.dbService.getSettingNumber("salary_amount", 10);
+    const { salaryBonusPercent } = await this.dbService.getReferralStats(user.id);
+    const amount = Math.floor(baseAmount * (1 + salaryBonusPercent / 100));
     const newCoins = user.coins + amount;
     await this.dbService.updateUserCoins(user.id, newCoins);
     const newCount = (user.salaryClaimCount || 0) + 1;

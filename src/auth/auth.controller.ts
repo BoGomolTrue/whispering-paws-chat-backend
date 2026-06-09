@@ -14,6 +14,7 @@ import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import { Request, Response } from "express";
 import { DatabaseService } from "../database/database.service";
+import { getClientIp } from "../common/utils/client-ip.util";
 import { AuthService } from "./auth.service";
 import { GuestLoginDto, LoginDto, RegisterDto } from "./dto/login.dto";
 
@@ -128,7 +129,7 @@ export class AuthController {
 
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() dto: RegisterDto, @Res() res: Response) {
+  async register(@Body() dto: RegisterDto, @Req() req: Request, @Res() res: Response) {
     const existing = await this.dbService.findUserByEmail(dto.email);
     if (existing) throw new BadRequestException("Email already registered");
     const nickExists = await this.dbService.findUserByNickname(
@@ -136,16 +137,21 @@ export class AuthController {
     );
     if (nickExists) throw new BadRequestException("Nickname already taken");
     const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const registrationIp = getClientIp(req);
     const newUser = await this.dbService.createUser({
       email: dto.email,
       password: hashedPassword,
       nickname: dto.nickname.trim(),
       characterType: dto.characterType,
       gender: dto.gender,
+      registrationIp,
     });
 
     if (dto.referralCode) {
-      await this.dbService.applyReferralCode(newUser.id, dto.referralCode);
+      await this.dbService.applyReferralCode(newUser.id, dto.referralCode, {
+        registrationIp,
+        email: dto.email,
+      });
     }
 
     const token = this.authService.signToken(newUser.id);
@@ -185,6 +191,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async vk(
     @Body() body: { sign?: string; signParams?: Record<string, unknown> },
+    @Req() req: Request,
     @Res() res: Response,
   ) {
     const { sign, signParams } = body;
@@ -227,6 +234,7 @@ export class AuthController {
       );
       const vkSex = signParams.vk_sex;
       const gender = vkSex === 1 || vkSex === "1" ? "female" : "male";
+      const registrationIp = getClientIp(req);
       user = await this.dbService.createUser({
         email: fakeEmail,
         password: fakePassword,
@@ -234,11 +242,16 @@ export class AuthController {
         characterType: "cat",
         gender,
         vkId,
+        registrationIp,
       });
       await this.dbService.addOwnedItem(user.id, "sparkle");
 
       if (body.signParams?.referralCode) {
-        await this.dbService.applyReferralCode(user.id, String(body.signParams.referralCode));
+        await this.dbService.applyReferralCode(
+          user.id,
+          String(body.signParams.referralCode),
+          { registrationIp, email: fakeEmail },
+        );
       }
     }
     const plain = user.get({ plain: true }) as {
@@ -266,7 +279,11 @@ export class AuthController {
 
   @Post("tg")
   @HttpCode(HttpStatus.OK)
-  async tg(@Body() body: { initData?: string }, @Res() res: Response) {
+  async tg(
+    @Body() body: { initData?: string },
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     const { initData } = body;
     const botToken = this.configService.get<string>("TG_BOT_TOKEN") || "";
     if (!botToken) {
@@ -314,6 +331,7 @@ export class AuthController {
         crypto.randomBytes(32).toString("hex"),
         10,
       );
+      const registrationIp = getClientIp(req);
       user = await this.dbService.createUser({
         email: fakeEmail,
         password: fakePassword,
@@ -321,12 +339,16 @@ export class AuthController {
         characterType: "cat",
         gender: "male",
         telegramId,
+        registrationIp,
       });
       await this.dbService.addOwnedItem(user.id, "sparkle");
 
       const referralCode = params.get("referralCode");
       if (referralCode) {
-        await this.dbService.applyReferralCode(user.id, referralCode);
+        await this.dbService.applyReferralCode(user.id, referralCode, {
+          registrationIp,
+          email: fakeEmail,
+        });
       }
     }
     const plain = user.get({ plain: true }) as {

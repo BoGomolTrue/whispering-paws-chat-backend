@@ -175,6 +175,10 @@ export class User extends Model<User> {
   @Column(DataType.BOOLEAN)
   referralBonusPaid: boolean;
 
+  @Default(null)
+  @Column(DataType.STRING(45))
+  registrationIp: string | null;
+
   @Default([])
   @AllowNull(false)
   @Column(DataType.JSON)

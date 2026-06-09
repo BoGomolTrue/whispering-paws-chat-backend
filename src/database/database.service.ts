@@ -3,6 +3,11 @@ import { InjectModel } from "@nestjs/sequelize";
 import { randomBytes } from "crypto";
 import { Op } from "sequelize";
 import { STARTER_QUEST_REWARD } from "../achievements/achievements.config";
+import {
+  getTotalReferralSalaryBonusPercent,
+  isReferralAllowed,
+  type ReferralContext,
+} from "../common/utils/referral.util";
 import { BotProfileInput, normalizeBotProfileInput } from "../bots/bot-profile.util";
 import {
   DAILY_QUESTS,
@@ -60,6 +65,7 @@ export interface DbUserRow {
   referralCode?: string | null;
   referredBy?: number | null;
   referralBonusPaid?: boolean;
+  registrationIp?: string | null;
   badges?: string[];
   starterQuestStep?: number;
 }
@@ -260,6 +266,7 @@ export class DatabaseService implements OnModuleInit {
     gender?: string;
     vkId?: number;
     telegramId?: string;
+    registrationIp?: string | null;
   }): Promise<User> {
     const startingCoins = await this.getSettingNumber("starting_coins", 100);
     const referralCode = randomBytes(5).toString("hex").toUpperCase();
@@ -272,6 +279,7 @@ export class DatabaseService implements OnModuleInit {
       coins: startingCoins,
       vkId: data.vkId ?? null,
       telegramId: data.telegramId ?? null,
+      registrationIp: data.registrationIp ?? null,
       referralCode,
     } as any);
   }
@@ -974,49 +982,100 @@ export class DatabaseService implements OnModuleInit {
     );
   }
 
+  async getReferredUserRatings(referrerId: number): Promise<number[]> {
+    const users = await this.userRepository.findAll({
+      where: { referredBy: referrerId },
+      attributes: ["id", "coins"],
+      raw: true,
+    });
+    if (!users.length) return [];
+
+    const userIds = users.map((u: { id: number }) => u.id);
+    const items = await this.userItemRepository.findAll({
+      where: { userId: userIds },
+      attributes: ["userId", "itemId"],
+      raw: true,
+    });
+
+    const itemsByUser = new Map<number, string[]>();
+    for (const row of items as { userId: number; itemId: string }[]) {
+      const list = itemsByUser.get(row.userId) ?? [];
+      list.push(row.itemId);
+      itemsByUser.set(row.userId, list);
+    }
+
+    return users.map((u: { id: number; coins: number }) => {
+      const owned = itemsByUser.get(u.id) ?? [];
+      return u.coins + this.calcInventoryValueFromIds(owned);
+    });
+  }
+
   async getReferralStats(
     userId: number,
-  ): Promise<{ code: string | null; referredCount: number }> {
+  ): Promise<{ code: string | null; referredCount: number; salaryBonusPercent: number }> {
     const user = await this.userRepository.findByPk(userId, { raw: true });
-    if (!user) return { code: null, referredCount: 0 };
+    if (!user) return { code: null, referredCount: 0, salaryBonusPercent: 0 };
 
-    const referrals = await this.userRepository.count({
-      where: { referredBy: userId },
-    });
+    const ratings = await this.getReferredUserRatings(userId);
 
     return {
       code: user.referralCode,
-      referredCount: referrals,
+      referredCount: ratings.length,
+      salaryBonusPercent: getTotalReferralSalaryBonusPercent(ratings),
     };
   }
 
   async applyReferralCode(
     newUserId: number,
     referralCode: string,
-    onlineUsersService?: any,
-  ): Promise<void> {
+    context: ReferralContext,
+  ): Promise<boolean> {
     const referrer = await this.userRepository.findOne({
       where: { referralCode },
       raw: true,
     });
 
-    if (!referrer) return;
+    if (!referrer) return false;
+
+    const referrerRow = referrer as {
+      id: number;
+      email: string;
+      registrationIp: string | null;
+    };
+
+    if (!isReferralAllowed(referrerRow, newUserId, context)) {
+      this.logger.warn(
+        `Referral rejected for user ${newUserId} via code ${referralCode}`,
+      );
+      return false;
+    }
+
+    const ip = context.registrationIp.trim();
+    if (ip) {
+      const sameIpReferral = await this.userRepository.count({
+        where: {
+          referredBy: referrerRow.id,
+          registrationIp: ip,
+        },
+      });
+      if (sameIpReferral > 0) return false;
+
+      const linkedSameIp = await this.userRepository.count({
+        where: {
+          registrationIp: ip,
+          id: { [Op.ne]: newUserId },
+          [Op.or]: [{ id: referrerRow.id }, { referredBy: referrerRow.id }],
+        },
+      });
+      if (linkedSameIp > 0) return false;
+    }
 
     await this.userRepository.update(
-      { referredBy: referrer.id },
+      { referredBy: referrerRow.id },
       { where: { id: newUserId } },
     );
 
-    const newCoins = referrer.coins + 500;
-    await this.updateUserCoins(referrer.id, newCoins);
-
-    if (onlineUsersService) {
-      try {
-        onlineUsersService.updateCoins(referrer.id, newCoins);
-      } catch (err) {
-        this.logger.warn(`Failed to update online user coins: ${err}`);
-      }
-    }
+    return true;
   }
 
   async findUserById(userId: number): Promise<User | null> {
