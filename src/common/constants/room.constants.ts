@@ -1,0 +1,1 @@
+export const MIN_ROOM_CREATE_RATING = 1000;

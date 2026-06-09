@@ -20,6 +20,7 @@ import { UserLog } from "./models/user-log.model";
 import { UserFriend } from "./models/user-friend.model";
 import { ProfilePost } from "./models/profile-post.model";
 import { ProfilePostComment } from "./models/profile-post-comment.model";
+import { SupportMessage } from "./models/support-message.model";
 import { ChatMessage } from "./models/chat-message.model";
 import { DirectMessage } from "./models/direct-message.model";
 import { Notification } from "./models/notification.model";
@@ -95,6 +96,8 @@ export class DatabaseService implements OnModuleInit {
     @InjectModel(ProfilePost) private profilePostRepository: typeof ProfilePost,
     @InjectModel(ProfilePostComment)
     private profilePostCommentRepository: typeof ProfilePostComment,
+    @InjectModel(SupportMessage)
+    private supportMessageRepository: typeof SupportMessage,
   ) {}
 
   async onModuleInit() {
@@ -1325,6 +1328,82 @@ export class DatabaseService implements OnModuleInit {
       raw: true,
     });
     return { items: rows, total: count, page: Math.max(page, 1), limit: safeLimit };
+  }
+
+  async createSupportMessage(
+    userId: number,
+    nickname: string,
+    category: string,
+    message: string,
+    imageUrl: string | null = null,
+  ) {
+    const row = await this.supportMessageRepository.create({
+      userId,
+      nickname,
+      category,
+      message,
+      imageUrl,
+      read: false,
+    } as any);
+    return row.get({ plain: true });
+  }
+
+  async listSupportMessagesForUser(userId: number, limit = 20) {
+    return this.supportMessageRepository.findAll({
+      where: { userId },
+      order: [["createdAt", "DESC"]],
+      limit: Math.min(Math.max(limit, 1), 50),
+      raw: true,
+    });
+  }
+
+  async getLatestSupportMessageAt(userId: number): Promise<number | null> {
+    const row = await this.supportMessageRepository.findOne({
+      where: { userId },
+      order: [["createdAt", "DESC"]],
+      attributes: ["createdAt"],
+      raw: true,
+    });
+    if (!row?.createdAt) return null;
+    return new Date(row.createdAt as string | Date).getTime();
+  }
+
+  async listSupportMessagesAdmin(
+    page = 1,
+    limit = 30,
+    unreadOnly = false,
+  ) {
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const offset = (Math.max(page, 1) - 1) * safeLimit;
+    const where = unreadOnly ? { read: false } : {};
+    const { rows, count } = await this.supportMessageRepository.findAndCountAll({
+      where,
+      order: [["createdAt", "DESC"]],
+      limit: safeLimit,
+      offset,
+      raw: true,
+    });
+    return { items: rows, total: count, page: Math.max(page, 1), limit: safeLimit };
+  }
+
+  async countUnreadSupportMessages(): Promise<number> {
+    return this.supportMessageRepository.count({ where: { read: false } });
+  }
+
+  async markSupportMessageRead(id: number): Promise<boolean> {
+    const [n] = await this.supportMessageRepository.update(
+      { read: true },
+      { where: { id } },
+    );
+    return n > 0;
+  }
+
+  async replySupportMessage(id: number, reply: string): Promise<boolean> {
+    const [n] = await this.supportMessageRepository.update(
+      { adminReply: reply, adminRepliedAt: new Date(), read: true },
+      { where: { id } },
+    );
+    return n > 0;
   }
 
   async getAdminUserDetail(userId: number) {

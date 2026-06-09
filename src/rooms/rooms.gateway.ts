@@ -1,5 +1,4 @@
 import { Logger, UseGuards } from "@nestjs/common";
-import * as bcrypt from "bcryptjs";
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,7 +9,11 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from "@nestjs/websockets";
+import * as bcrypt from "bcryptjs";
 import { Server, Socket } from "socket.io";
+import { AiService } from "../ai/ai.service";
+import { BotsService } from "../bots/bots.service";
+import { MIN_ROOM_CREATE_RATING } from "../common/constants/room.constants";
 import {
   EMOTION_SYSTEM_MESSAGES,
   JOIN_SYSTEM_MESSAGES,
@@ -18,14 +21,12 @@ import {
   pickSystemMessage,
 } from "../common/constants/system-messages";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
-import { getSalaryCooldownRemain } from "../common/utils/salary.util";
 import { OnlineUsersService } from "../common/services/online-users.service";
+import { getSalaryCooldownRemain } from "../common/utils/salary.util";
 import { DatabaseService } from "../database/database.service";
 import { FilesService } from "../files/files.service";
-import { PaymentService } from "../payment/payment.service";
-import { AiService } from "../ai/ai.service";
-import { BotsService } from "../bots/bots.service";
 import { NotificationsService } from "../notifications/notifications.service";
+import { PaymentService } from "../payment/payment.service";
 import { ShopService } from "../shop/shop.service";
 
 @WebSocketGateway()
@@ -299,9 +300,7 @@ export class RoomsGateway
           });
       }
 
-      if (
-        !this.onlineUsersService.isAdminHidden(user, user.roomId)
-      ) {
+      if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
         client.to(`room:${user.roomId}`).emit("user:leave", client.id);
       }
       if (!user.isGuest) {
@@ -323,9 +322,7 @@ export class RoomsGateway
     const roomList = rooms
       .filter(
         (r) =>
-          r.name !== "Guest Room" ||
-          user?.role === "admin" ||
-          !!user?.isGuest,
+          r.name !== "Guest Room" || user?.role === "admin" || !!user?.isGuest,
       )
       .map((r) => this.mapRoomDto(r));
     client.emit("room:list", roomList);
@@ -340,6 +337,12 @@ export class RoomsGateway
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.isGuest) {
       client.emit("room:error", "Sign up to create rooms");
+      return;
+    }
+
+    const rating = user.coins + (user.inventoryValue ?? 0);
+    if (user.role !== "admin" && rating < MIN_ROOM_CREATE_RATING) {
+      client.emit("room:error", "Rating 1000 required to create rooms");
       return;
     }
 
@@ -569,7 +572,6 @@ export class RoomsGateway
       });
     }
 
-    
     const emotionText = EMOTION_SYSTEM_MESSAGES[emotion];
     if (!emotionText) return;
     await this.dbService.saveChatMessage({
@@ -619,7 +621,10 @@ export class RoomsGateway
   }
 
   private getSalaryCooldownRemain(user: any): number {
-    return getSalaryCooldownRemain(user.lastSalaryAt ?? 0, user.salaryClaimCount ?? 0);
+    return getSalaryCooldownRemain(
+      user.lastSalaryAt ?? 0,
+      user.salaryClaimCount ?? 0,
+    );
   }
 
   @SubscribeMessage("salary:claim")
@@ -631,8 +636,13 @@ export class RoomsGateway
       client.emit("salary:wait", { remainMs: remain });
       return;
     }
-    const baseAmount = await this.dbService.getSettingNumber("salary_amount", 10);
-    const { salaryBonusPercent } = await this.dbService.getReferralStats(user.id);
+    const baseAmount = await this.dbService.getSettingNumber(
+      "salary_amount",
+      10,
+    );
+    const { salaryBonusPercent } = await this.dbService.getReferralStats(
+      user.id,
+    );
     const amount = Math.floor(baseAmount * (1 + salaryBonusPercent / 100));
     const newCoins = user.coins + amount;
     await this.dbService.updateUserCoins(user.id, newCoins);
@@ -691,7 +701,6 @@ export class RoomsGateway
     user.invisible = next;
     client.emit("user:invisibleChanged", { invisible: next });
     if (user.roomId) {
-      
       if (next) {
         const leaveMessage = pickSystemMessage(LEAVE_SYSTEM_MESSAGES);
         void this.dbService
@@ -752,7 +761,6 @@ export class RoomsGateway
     const user = this.onlineUsersService.get(client.id);
     if (!user || !user.roomId) return;
 
-    
     const room = await this.dbService.getRoomById(user.roomId);
     if (!room) return;
 
@@ -805,7 +813,6 @@ export class RoomsGateway
       });
     }
 
-    
     this.server.in(`room:${user.roomId}`).emit("room:backgroundChanged", {
       backgroundType,
       weather,

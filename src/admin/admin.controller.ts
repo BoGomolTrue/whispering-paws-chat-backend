@@ -223,6 +223,56 @@ export class AdminController {
     return { ok: true };
   }
 
+  @Get("support/unread-count")
+  async supportUnreadCount(@Req() req: Request) {
+    await this.requireAdmin(req);
+    const count = await this.dbService.countUnreadSupportMessages();
+    return { count };
+  }
+
+  @Get("support")
+  async supportMessages(
+    @Req() req: Request,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("unreadOnly") unreadOnly?: string,
+  ) {
+    await this.requireAdmin(req);
+    return this.dbService.listSupportMessagesAdmin(
+      parseInt(page ?? "1", 10) || 1,
+      parseInt(limit ?? "30", 10) || 30,
+      unreadOnly === "1" || unreadOnly === "true",
+    );
+  }
+
+  @Patch("support/:id/read")
+  async markSupportRead(
+    @Req() req: Request,
+    @Param("id", ParseIntPipe) id: number,
+  ) {
+    await this.requireAdmin(req);
+    const ok = await this.dbService.markSupportMessageRead(id);
+    if (!ok) throw new NotFoundException();
+    return { ok: true };
+  }
+
+  @Patch("support/:id/reply")
+  async replySupport(
+    @Req() req: Request,
+    @Param("id", ParseIntPipe) id: number,
+    @Body() body: { reply?: string },
+  ) {
+    const admin = await this.requireAdmin(req);
+    const reply = (body.reply ?? "").trim();
+    if (reply.length < 1 || reply.length > 2000) {
+      throw new BadRequestException("Invalid reply");
+    }
+    const ok = await this.dbService.replySupportMessage(id, reply);
+    if (!ok) throw new NotFoundException();
+    await this.audit(admin, "support_reply", null, { supportId: id });
+    return { ok: true };
+  }
+
   @Get("logs")
   async adminLogs(
     @Req() req: Request,

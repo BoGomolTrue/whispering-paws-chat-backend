@@ -18,6 +18,7 @@ import { UserLog } from "./models/user-log.model";
 import { UserFriend } from "./models/user-friend.model";
 import { ProfilePost } from "./models/profile-post.model";
 import { ProfilePostComment } from "./models/profile-post-comment.model";
+import { SupportMessage } from "./models/support-message.model";
 
 @Global()
 @Module({
@@ -44,6 +45,7 @@ import { ProfilePostComment } from "./models/profile-post-comment.model";
           UserFriend,
           ProfilePost,
           ProfilePostComment,
+          SupportMessage,
         ],
         autoLoadModels: true,
         synchronize: configService.get("NODE_ENV") !== "production",
@@ -69,6 +71,7 @@ import { ProfilePostComment } from "./models/profile-post-comment.model";
       UserFriend,
       ProfilePost,
       ProfilePostComment,
+      SupportMessage,
     ]),
   ],
   providers: [DatabaseService],
