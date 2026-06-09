@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { AdminModule } from "./admin/admin.module";
 import { AiModule } from "./ai/ai.module";
 import { AuthModule } from "./auth/auth.module";
 import { BotsModule } from "./bots/bots.module";
@@ -22,6 +23,7 @@ import { UsersModule } from "./users/users.module";
     }),
     CommonModule,
     DatabaseModule,
+    AdminModule,
     AuthModule,
     UsersModule,
     RoomsModule,

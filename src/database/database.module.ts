@@ -11,7 +11,13 @@ import { Notification } from "./models/notification.model";
 import { UserDaily } from "./models/user-daily.model";
 import { UserEquipped } from "./models/user-equipped.model";
 import { UserItem } from "./models/user-item.model";
+import { Bot } from "./models/bot.model";
 import { User } from "./models/user.model";
+import { AdminLog } from "./models/admin-log.model";
+import { UserLog } from "./models/user-log.model";
+import { UserFriend } from "./models/user-friend.model";
+import { ProfilePost } from "./models/profile-post.model";
+import { ProfilePostComment } from "./models/profile-post-comment.model";
 
 @Global()
 @Module({
@@ -32,6 +38,12 @@ import { User } from "./models/user.model";
           Rank,
           UserDaily,
           Notification,
+          Bot,
+          AdminLog,
+          UserLog,
+          UserFriend,
+          ProfilePost,
+          ProfilePostComment,
         ],
         autoLoadModels: true,
         synchronize: configService.get("NODE_ENV") !== "production",
@@ -51,6 +63,12 @@ import { User } from "./models/user.model";
       Rank,
       UserDaily,
       Notification,
+      Bot,
+      AdminLog,
+      UserLog,
+      UserFriend,
+      ProfilePost,
+      ProfilePostComment,
     ]),
   ],
   providers: [DatabaseService],

@@ -26,6 +26,17 @@ export class FilesService {
     return `/uploads/${filename}`;
   }
 
+  async savePostImage(dataUrl: string, userId: number): Promise<string> {
+    const { buffer, ext } = this.parseDataUrl(dataUrl);
+    if (buffer.length > 2 * 1024 * 1024) throw new Error("TOO_LARGE");
+
+    const filename = `post_${userId}_${Date.now()}_${crypto.randomBytes(4).toString("hex")}.${ext}`;
+    const filePath = path.join(this.uploadsDir, filename);
+
+    await fs.promises.writeFile(filePath, buffer);
+    return `/uploads/${filename}`;
+  }
+
   async saveChatImage(dataUrl: string): Promise<string> {
     const { buffer, ext } = this.parseDataUrl(dataUrl);
     if (buffer.length > 2 * 1024 * 1024) throw new Error("TOO_LARGE");

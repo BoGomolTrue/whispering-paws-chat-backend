@@ -123,6 +123,31 @@ export class ShopService {
     await this.dbService.addOwnedItem(toUserId, itemId);
   }
 
+  async chargeGift(fromUserId: number, itemId: string) {
+    const sender = this.onlineUsersService.getById(fromUserId);
+    if (!sender) throw new Error("User not online");
+
+    const item = this.getItemFromCache(itemId);
+    if (!item) throw new Error("Item not found");
+    if (!item.isActive) throw new Error("Item not available");
+
+    const price = item.effectivePrice ?? item.price;
+    if (sender.coins < price) throw new Error("Not enough coins");
+
+    sender.coins -= price;
+    await this.dbService.updateUserCoins(fromUserId, sender.coins);
+    await this.dbService.addTotalSpent(fromUserId, price);
+    await this.dbService.incDailyBought(fromUserId);
+
+    return {
+      coins: sender.coins,
+      itemId,
+      itemName: item.name ?? itemId,
+      category: item.category,
+      color: null,
+    };
+  }
+
   async giftPurchase(fromUserId: number, toUserId: number, itemId: string) {
     const sender = this.onlineUsersService.getById(fromUserId);
     const recipient = this.onlineUsersService.getById(toUserId);
@@ -135,6 +160,15 @@ export class ShopService {
     if (!item.isActive) throw new Error("Item not available");
     if (recipient.ownedItems.includes(itemId)) {
       throw new Error("User already has this item");
+    }
+
+    const genderFilter = item.genderFilter ?? "all";
+    if (
+      genderFilter !== "all" &&
+      recipient.gender &&
+      genderFilter !== recipient.gender
+    ) {
+      throw new Error("Item not for recipient gender");
     }
 
     const price = item.effectivePrice ?? item.price;

@@ -7,8 +7,12 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import { AiService } from "../ai/ai.service";
+import { BotsService } from "../bots/bots.service";
+import { BotInstance } from "../bots/bots.constants";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
 import { OnlineUsersService } from "../common/services/online-users.service";
+import { DatabaseService } from "../database/database.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { VALID_CATEGORIES } from "./shop.data.constant";
 import { getShopTranslations } from "./shop.translations";
@@ -26,6 +30,9 @@ export class ShopGateway {
     private shopService: ShopService,
     private onlineUsersService: OnlineUsersService,
     private notificationsService: NotificationsService,
+    private botsService: BotsService,
+    private aiService: AiService,
+    private dbService: DatabaseService,
   ) {}
 
   @SubscribeMessage("shop:list")
@@ -37,7 +44,7 @@ export class ShopGateway {
   @SubscribeMessage("shop:translations")
   handleTranslations(
     @ConnectedSocket() client: Socket,
-    @MessageBody() locale: 'en' | 'ru' = 'en',
+    @MessageBody() locale: "en" | "ru" = "en",
   ) {
     const translations = getShopTranslations(locale);
     client.emit("shop:translations", translations);
@@ -62,6 +69,10 @@ export class ShopGateway {
     try {
       const result = await this.shopService.buyItem(user.id, itemId, color);
       client.emit("shop:bought", { itemId, coins: result.coins, color });
+      void this.dbService.writeUserLog(user.id, "shop_buy", `Покупка: ${itemId}`, {
+        itemId,
+        coins: result.coins,
+      });
       if (!user.ownedItems.includes(itemId)) {
         user.ownedItems.push(itemId);
       }
@@ -91,6 +102,11 @@ export class ShopGateway {
         coins: result.coins,
         refund: result.refund,
       });
+      void this.dbService.writeUserLog(user.id, "shop_sell", `Продажа: ${itemId}`, {
+        itemId,
+        refund: result.refund,
+        coins: result.coins,
+      });
       user.ownedItems = user.ownedItems.filter((id) => id !== itemId);
       if (wasEquipped && user.roomId) {
         client.to(`room:${user.roomId}`).emit("user:equip", {
@@ -112,6 +128,12 @@ export class ShopGateway {
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.isGuest || !data?.toUserId || !data?.itemId) return;
     if (data.toUserId === user.id) return;
+
+    const bot = this.botsService.getBotById(data.toUserId);
+    if (bot) {
+      await this.handleBotGift(client, user, bot, data.itemId);
+      return;
+    }
 
     const recipient = this.onlineUsersService.getById(data.toUserId);
     if (!recipient) {
@@ -140,12 +162,16 @@ export class ShopGateway {
           ownedItems: recipient.ownedItems,
           inventoryValue: recipient.inventoryValue,
         });
-        void this.notificationsService.onGiftReceived(recipientSock, data.toUserId, {
-          fromNickname: user.nickname,
-          itemId: result.itemId,
-          itemName: result.itemName,
-          fromUserId: user.id,
-        });
+        void this.notificationsService.onGiftReceived(
+          recipientSock,
+          data.toUserId,
+          {
+            fromNickname: user.nickname,
+            itemId: result.itemId,
+            itemName: result.itemName,
+            fromUserId: user.id,
+          },
+        );
       }
 
       client.emit("gift:sent", {
@@ -153,21 +179,99 @@ export class ShopGateway {
         itemId: result.itemId,
         coins: result.coins,
       });
+      void this.dbService.writeUserLog(user.id, "gift_sent", `Подарок ${result.itemId} → ${recipient.nickname}`, {
+        toUserId: data.toUserId,
+        itemId: result.itemId,
+      });
+      void this.dbService.writeUserLog(
+        data.toUserId,
+        "gift_received",
+        `Подарок ${result.itemId} от ${user.nickname}`,
+        { fromUserId: user.id, itemId: result.itemId },
+      );
 
       if (user.roomId) {
-        const giftText = `gifted ${recipient.nickname}: ${result.itemName}`;
-        this.server.to(`room:${user.roomId}`).emit("chat:message", {
-          msgId: Date.now(),
-          socketId: "__system__",
-          nickname: user.nickname,
-          text: giftText,
-          timestamp: Date.now(),
-          gender: user.gender,
-        });
+        await this.emitGiftChatMessage(user, recipient.nickname, result.itemName);
       }
     } catch (e) {
       client.emit("shop:error", e instanceof Error ? e.message : "Error");
     }
+  }
+
+  private async handleBotGift(
+    client: Socket,
+    user: { id: number; nickname: string; gender: string | null; roomId: number },
+    bot: BotInstance,
+    itemId: string,
+  ) {
+
+    if (bot.ownedItems.includes(itemId)) {
+      client.emit("shop:error", "User already has this item");
+      return;
+    }
+
+    const item = this.shopService.getItemFromCache(itemId);
+    if (item) {
+      const genderFilter = item.genderFilter ?? "all";
+      if (genderFilter !== "all" && bot.gender && genderFilter !== bot.gender) {
+        client.emit("shop:error", "Item not for recipient gender");
+        return;
+      }
+    }
+
+    try {
+      const result = await this.shopService.chargeGift(user.id, itemId);
+      const inventoryValue = this.shopService.calcInventoryValue([
+        ...bot.ownedItems,
+        itemId,
+      ]);
+      this.botsService.receiveGift(
+        bot,
+        itemId,
+        result.category,
+        result.color,
+        inventoryValue,
+      );
+
+      client.emit("gift:sent", {
+        toUserId: bot.id,
+        itemId: result.itemId,
+        coins: result.coins,
+      });
+
+      if (user.roomId) {
+        await this.emitGiftChatMessage(user, bot.nickname, result.itemName);
+      }
+
+      void this.aiService.thankForGift(bot, user.nickname, result.itemName);
+    } catch (e) {
+      client.emit("shop:error", e instanceof Error ? e.message : "Error");
+    }
+  }
+
+  private async emitGiftChatMessage(
+    user: { nickname: string; gender: string | null; roomId: number },
+    recipientNick: string,
+    itemName: string,
+  ) {
+    const giftText = `gifted ${recipientNick}: ${itemName}`;
+    const saved = await this.dbService.saveChatMessage({
+      roomId: user.roomId,
+      userId: null,
+      nickname: user.nickname,
+      text: giftText,
+      gender: user.gender,
+      isSystem: true,
+    });
+    this.server.to(`room:${user.roomId}`).emit("chat:message", {
+      msgId: saved.id,
+      socketId: "__system__",
+      nickname: user.nickname,
+      text: giftText,
+      timestamp: Date.now(),
+      gender: user.gender,
+      isSystem: true,
+    });
   }
 
   @SubscribeMessage("equip")

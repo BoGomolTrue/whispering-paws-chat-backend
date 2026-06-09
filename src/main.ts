@@ -1,12 +1,12 @@
 import { Logger, ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
-import { SocketIoAdapter } from "./socket-io.adapter";
 import * as cookieParser from "cookie-parser";
 import * as express from "express";
 import * as fs from "fs";
 import * as path from "path";
 import { AppModule } from "./app.module";
+import { SocketIoAdapter } from "./socket-io.adapter";
 
 async function bootstrap() {
   const UPLOADS_DIR = path.join(process.cwd(), "public", "uploads");
@@ -59,7 +59,7 @@ async function bootstrap() {
       callback(null, allowed ? origin : false);
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
   });
 
@@ -75,7 +75,10 @@ async function bootstrap() {
   );
 
   await app.listen(port, listenHost);
-  Logger.log(`Application is running on: http://localhost:${port}`, "Bootstrap");
+  Logger.log(
+    `Application is running on: http://localhost:${port}`,
+    "Bootstrap",
+  );
 }
 
 void bootstrap();

@@ -120,6 +120,9 @@ export class AuthController {
     if (!valid) throw new BadRequestException("Invalid email or password");
     const token = this.authService.signToken(u.id);
     setTokenCookie(res, token);
+    void this.dbService.writeUserLog(u.id, "login", "Вход в аккаунт", {
+      email: dto.email,
+    });
     return res.json({ token, user: { id: u.id, nickname: u.nickname } });
   }
 
@@ -147,6 +150,9 @@ export class AuthController {
 
     const token = this.authService.signToken(newUser.id);
     setTokenCookie(res, token);
+    void this.dbService.writeUserLog(newUser.id, "register", "Регистрация", {
+      nickname: newUser.nickname,
+    });
     return res.json({
       token,
       user: { id: newUser.id, nickname: newUser.nickname },

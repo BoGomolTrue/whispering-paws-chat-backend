@@ -9,6 +9,7 @@ import {
 import { Server, Socket } from "socket.io";
 import { STARTER_QUEST_REWARD } from "../achievements/achievements.config";
 import { AiService } from "../ai/ai.service";
+import { BotsService } from "../bots/bots.service";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
 import { OnlineUsersService } from "../common/services/online-users.service";
 import { RateLimitService } from "../common/services/rate-limit.service";
@@ -28,6 +29,7 @@ export class ChatGateway {
     private onlineUsersService: OnlineUsersService,
     private rateLimitService: RateLimitService,
     private aiService: AiService,
+    private botsService: BotsService,
     private filesService: FilesService,
   ) {}
 
@@ -64,6 +66,10 @@ export class ChatGateway {
 
     if (!user.isGuest) {
       void this.dbService.incDailyMessages(user.id).catch(() => {});
+      const preview = text.length > 160 ? `${text.slice(0, 160)}…` : text;
+      void this.dbService.writeUserLog(user.id, "chat_message", preview, {
+        roomId: user.roomId,
+      });
       const quest = await this.dbService.onStarterQuestFirstMessage(user.id);
       if (quest) {
         user.coins = quest.coins;
@@ -111,6 +117,23 @@ export class ChatGateway {
       socketId: client.id,
       nickname: user.nickname,
     });
+  }
+
+  @SubscribeMessage("dm:typing")
+  handleDmTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { toUserId?: number },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || data?.toUserId == null) return;
+    this.onlineUsersService.touchActivity(client.id);
+    const payload = { socketId: client.id, nickname: user.nickname };
+    const bot = this.botsService.getAllBots().find((b) => b.id === data.toUserId);
+    if (bot) return;
+    const recipient = this.onlineUsersService.getById(data.toUserId);
+    if (!recipient || recipient.isGuest) return;
+    const sock = this.server.sockets.sockets.get(recipient.socketId);
+    sock?.emit("dm:typing", payload);
   }
 
   @SubscribeMessage("chat:image")
@@ -237,12 +260,46 @@ export class ChatGateway {
     }
     const text = (data.text ?? "").trim().substring(0, 500);
     if (!text) return;
+
+    const bot = this.botsService.getAllBots().find((b) => b.id === data.toUserId);
+    if (bot) {
+      const saved = await this.dbService.saveDirectMessage(
+        user.id,
+        data.toUserId,
+        text,
+      );
+      const msg = {
+        id: saved.id,
+        fromUserId: user.id,
+        toUserId: data.toUserId,
+        nickname: user.nickname,
+        text,
+        timestamp: parseInt(saved.timestamp, 10),
+      };
+      client.emit("dm:message", msg);
+      const reply = await this.aiService.handleDm(user.id, user.nickname, data.toUserId);
+      if (reply) {
+        void this.botsService.deliverDmMessage(
+          client,
+          bot,
+          user.id,
+          reply,
+          this.dbService,
+        );
+      }
+      return;
+    }
+
     const hadIncoming = await this.dbService.hasIncomingDm(data.toUserId, user.id);
     const saved = await this.dbService.saveDirectMessage(
       user.id,
       data.toUserId,
       text,
     );
+    const preview = text.length > 160 ? `${text.slice(0, 160)}…` : text;
+    void this.dbService.writeUserLog(user.id, "dm_send", preview, {
+      toUserId: data.toUserId,
+    });
     const msg = {
       id: saved.id,
       fromUserId: user.id,

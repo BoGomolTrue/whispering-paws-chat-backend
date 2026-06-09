@@ -48,7 +48,7 @@ export class NotificationsService {
   }
 
   async onSalaryClaimed(client: Socket, user: SalaryUserState): Promise<void> {
-    await this.dbService.markNotificationsReadByType(
+    await this.dbService.deleteNotificationsByType(
       user.id,
       NOTIFICATION_TYPE_SALARY,
     );
@@ -135,12 +135,32 @@ export class NotificationsService {
     userId: number,
     notificationId: number,
   ): Promise<NotificationDto[]> {
-    await this.dbService.markNotificationRead(notificationId, userId);
+    const notification = await this.dbService.getNotificationById(
+      notificationId,
+      userId,
+    );
+    if (notification?.type === NOTIFICATION_TYPE_SALARY) {
+      await this.dbService.deleteNotification(notificationId, userId);
+    } else {
+      await this.dbService.markNotificationRead(notificationId, userId);
+    }
     return this.dbService.getNotifications(userId);
   }
 
   async markAllRead(userId: number): Promise<NotificationDto[]> {
+    await this.dbService.deleteNotificationsByType(
+      userId,
+      NOTIFICATION_TYPE_SALARY,
+    );
     await this.dbService.markAllNotificationsRead(userId);
+    return this.dbService.getNotifications(userId);
+  }
+
+  async dismiss(
+    userId: number,
+    notificationId: number,
+  ): Promise<NotificationDto[]> {
+    await this.dbService.deleteNotification(notificationId, userId);
     return this.dbService.getNotifications(userId);
   }
 

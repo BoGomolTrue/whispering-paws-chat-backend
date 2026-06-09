@@ -30,6 +30,8 @@ const PROFILE_KEYS = [
   "anketa_avatar",
 ] as const;
 
+const BOT_USER_ID_MIN = 900000;
+
 @WebSocketGateway()
 @UseGuards(WsJwtGuard)
 export class UsersGateway {
@@ -184,6 +186,199 @@ export class UsersGateway {
         err instanceof Error ? err.message : "Password change failed",
       );
     }
+  }
+
+  @SubscribeMessage("profile:view")
+  async handleProfileView(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userId?: number },
+  ) {
+    const viewer = this.onlineUsersService.get(client.id);
+    if (!viewer || viewer.isGuest) {
+      client.emit("profile:error", "Guests cannot view profiles");
+      return;
+    }
+    const targetUserId = data?.userId ?? viewer.id;
+    await this.emitProfileView(client, viewer.id, targetUserId);
+  }
+
+  @SubscribeMessage("friends:add")
+  async handleFriendsAdd(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userId?: number },
+  ) {
+    const viewer = this.onlineUsersService.get(client.id);
+    if (!viewer || viewer.isGuest || data?.userId == null) return;
+    const friendId = data.userId;
+    if (friendId === viewer.id) return;
+    if (friendId >= BOT_USER_ID_MIN) {
+      client.emit("profile:error", "Cannot add bot as friend");
+      return;
+    }
+    const friend = await this.dbService.getUserById(friendId);
+    if (!friend || friend.isGuest) {
+      client.emit("profile:error", "User not found");
+      return;
+    }
+    await this.dbService.addUserFriend(viewer.id, friendId);
+    await this.emitProfileView(client, viewer.id, friendId);
+  }
+
+  @SubscribeMessage("friends:remove")
+  async handleFriendsRemove(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { userId?: number },
+  ) {
+    const viewer = this.onlineUsersService.get(client.id);
+    if (!viewer || viewer.isGuest || data?.userId == null) return;
+    await this.dbService.removeUserFriend(viewer.id, data.userId);
+    await this.emitProfileView(client, viewer.id, data.userId);
+  }
+
+  @SubscribeMessage("profile:uploadPostImage")
+  async handleProfileUploadPostImage(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { dataUrl?: string },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest) {
+      client.emit("profile:postImageError", { message: "Guests cannot post" });
+      return;
+    }
+    const dataUrl = data?.dataUrl;
+    if (!dataUrl || typeof dataUrl !== "string") {
+      client.emit("profile:postImageError", { message: "Invalid data" });
+      return;
+    }
+    try {
+      const url = await this.filesService.savePostImage(dataUrl, user.id);
+      client.emit("profile:postImageUrl", { url });
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message === "TOO_LARGE"
+            ? "Image too large"
+            : err.message === "INVALID_FORMAT"
+              ? "Unsupported image format"
+              : "Upload failed"
+          : "Upload failed";
+      client.emit("profile:postImageError", { message });
+    }
+  }
+
+  @SubscribeMessage("profile:post")
+  async handleProfilePost(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { text?: string; imageUrl?: string | null },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest) {
+      client.emit("profile:error", "Guests cannot post");
+      return;
+    }
+    const text = (data?.text ?? "").trim().slice(0, 500);
+    let imageUrl: string | null = null;
+    if (typeof data?.imageUrl === "string" && data.imageUrl.trim()) {
+      const url = data.imageUrl.trim();
+      if (!url.startsWith("/uploads/post_")) {
+        client.emit("profile:error", "Invalid data");
+        return;
+      }
+      imageUrl = url;
+    }
+    if (!text && !imageUrl) {
+      client.emit("profile:error", "Post is empty");
+      return;
+    }
+    await this.dbService.createProfilePost(user.id, text, imageUrl);
+    await this.emitProfileView(client, user.id, user.id);
+  }
+
+  @SubscribeMessage("profile:postDelete")
+  async handleProfilePostDelete(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { postId?: number },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || data?.postId == null) return;
+    const ok = await this.dbService.deleteProfilePost(user.id, data.postId);
+    if (!ok) {
+      client.emit("profile:error", "Post not found");
+      return;
+    }
+    await this.emitProfileView(client, user.id, user.id);
+  }
+
+  @SubscribeMessage("profile:postComment")
+  async handleProfilePostComment(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { postId?: number; text?: string },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || data?.postId == null) {
+      client.emit("profile:error", "Guests cannot comment");
+      return;
+    }
+    const text = (data.text ?? "").trim().slice(0, 300);
+    if (!text) {
+      client.emit("profile:error", "Comment is empty");
+      return;
+    }
+    const result = await this.dbService.createProfilePostComment(
+      user.id,
+      data.postId,
+      text,
+    );
+    if (!result) {
+      client.emit("profile:error", "Post not found");
+      return;
+    }
+    await this.emitProfileView(client, user.id, result.postOwnerId);
+  }
+
+  @SubscribeMessage("profile:postCommentDelete")
+  async handleProfilePostCommentDelete(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { commentId?: number },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || data?.commentId == null) return;
+    const result = await this.dbService.deleteProfilePostComment(
+      user.id,
+      data.commentId,
+    );
+    if (!result.ok || result.postOwnerId == null) {
+      client.emit("profile:error", "Comment not found");
+      return;
+    }
+    await this.emitProfileView(client, user.id, result.postOwnerId);
+  }
+
+  private async emitProfileView(
+    client: Socket,
+    viewerId: number,
+    targetUserId: number,
+  ) {
+    const target = await this.dbService.getUserById(targetUserId);
+    if (!target || target.isGuest) {
+      client.emit("profile:error", "User not found");
+      return;
+    }
+    const friends = await this.dbService.listUserFriends(targetUserId);
+    const posts = await this.dbService.listProfilePosts(targetUserId);
+    const rooms = await this.dbService.listUserCreatedRooms(targetUserId);
+    const isFriend =
+      viewerId !== targetUserId
+        ? await this.dbService.isUserFriend(viewerId, targetUserId)
+        : false;
+    client.emit("profile:viewData", {
+      userId: targetUserId,
+      friends,
+      posts,
+      rooms,
+      isFriend,
+      isOwn: targetUserId === viewerId,
+    });
   }
 
   @SubscribeMessage("referrals:get")

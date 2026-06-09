@@ -1,4 +1,3 @@
-
 type CharacterType = "cat" | "dog" | "fox" | "panda" | "raccoon";
 
 interface RenderBox {
@@ -28,7 +27,6 @@ export interface ShopItemRaw {
 
 const R = { x: -40, y: -74, w: 80, h: 120 };
 
-
 const MASK_R = { x: -22, y: -64, w: 44, h: 38 };
 const CHAIN_R = { x: -24, y: -30, w: 48, h: 22 };
 const D = {
@@ -42,8 +40,6 @@ const D = {
 };
 
 const SHOP_ITEMS: ShopItemRaw[] = [
-  
-  
   {
     id: "sparkle",
     name: "Sparkle",
@@ -102,7 +98,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "common",
   },
 
-  
   {
     id: "ghost",
     name: "Ghosts",
@@ -144,7 +139,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "uncommon",
   },
 
-  
   {
     id: "ice",
     name: "Ice",
@@ -186,7 +180,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "rare",
   },
 
-  
   {
     id: "orbit",
     name: "Orbit",
@@ -434,8 +427,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "common",
   },
 
-  
-  
   {
     id: "beanie",
     name: "Beanie",
@@ -467,7 +458,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "common",
   },
 
-  
   {
     id: "red_horns",
     name: "Red Horns",
@@ -514,8 +504,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "epic",
   },
 
-  
-  
   {
     id: "silver_chain",
     name: "Silver Chain",
@@ -532,7 +520,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "common",
   },
 
-  
   {
     id: "hockey_mask",
     name: "Hockey Mask",
@@ -564,7 +551,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "uncommon",
   },
 
-  
   {
     id: "gold_chain",
     name: "Gold Chain",
@@ -581,7 +567,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "rare",
   },
 
-  
   {
     id: "sparkler_item",
     name: "Sparkler",
@@ -596,7 +581,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "common",
   },
 
-  
   {
     id: "red_roses",
     name: "Red Roses",
@@ -613,8 +597,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "rare",
   },
 
-  
-  
   {
     id: "mercedes_benz_c",
     name: "Mercedes-Benz C-Class",
@@ -644,8 +626,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     rarity: "epic",
   },
 
-  
-  
   {
     id: "symbols_tatoo",
     name: "Symbols Tattoo",
@@ -708,9 +688,6 @@ const SHOP_ITEMS: ShopItemRaw[] = [
     ...D,
     rarity: "common",
   },
-
-  
-  
 ];
 
 const SHOP_ITEMS_MAP = new Map(SHOP_ITEMS.map((i) => [i.id, i]));
@@ -756,7 +733,7 @@ export function getShopItemsForClient(): (ShopItemRaw & {
   const isDev = process.env.NODE_ENV === "development";
   return getActiveShopItems().map((item) => {
     const withPrice = applyEffectivePrice(item);
-    
+
     if (isDev) {
       return { ...withPrice, genderFilter: "all" as const };
     }

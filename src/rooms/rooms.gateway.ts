@@ -1,4 +1,5 @@
 import { Logger, UseGuards } from "@nestjs/common";
+import * as bcrypt from "bcryptjs";
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,12 +11,20 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
+import {
+  EMOTION_SYSTEM_MESSAGES,
+  JOIN_SYSTEM_MESSAGES,
+  LEAVE_SYSTEM_MESSAGES,
+  pickSystemMessage,
+} from "../common/constants/system-messages";
 import { WsJwtGuard } from "../common/guards/ws-jwt.guard";
 import { getSalaryCooldownRemain } from "../common/utils/salary.util";
 import { OnlineUsersService } from "../common/services/online-users.service";
 import { DatabaseService } from "../database/database.service";
 import { FilesService } from "../files/files.service";
 import { PaymentService } from "../payment/payment.service";
+import { AiService } from "../ai/ai.service";
+import { BotsService } from "../bots/bots.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { ShopService } from "../shop/shop.service";
 
@@ -32,6 +41,14 @@ export class RoomsGateway
   afterInit() {
     this.onlineUsersService.setIo(this.server);
     this.onlineUsersService.startAfkWatcher();
+    this.botsService.setIo(this.server);
+    this.botsService.setAiDialogueCallback((participants) =>
+      this.aiService.runBotDialogue(participants),
+    );
+    this.botsService.setAiAmbientCallback(() =>
+      this.aiService.runAmbientChatter(),
+    );
+    void this.initBots();
   }
 
   constructor(
@@ -42,7 +59,20 @@ export class RoomsGateway
     private notificationsService: NotificationsService,
     private filesService: FilesService,
     private wsJwtGuard: WsJwtGuard,
+    private botsService: BotsService,
+    private aiService: AiService,
   ) {}
+
+  private async initBots() {
+    const generalRoomId = await this.dbService.getDefaultRoomId();
+    await this.botsService.init(generalRoomId);
+    if (this.botsService.isEnabled()) {
+      this.botsService.start();
+      this.logger.log(`Bots enabled in General Room (id=${generalRoomId})`);
+    } else {
+      this.logger.log("Bots disabled (AI_BOTS != true)");
+    }
+  }
 
   private isSystemRoom(room: { name: string }) {
     return room.name === "General Room" || room.name === "Guest Room";
@@ -57,6 +87,7 @@ export class RoomsGateway
     weather?: string;
     photoUrl?: string | null;
     description?: string | null;
+    passwordHash?: string | null;
   }) {
     return {
       id: room.id,
@@ -68,7 +99,41 @@ export class RoomsGateway
       weather: room.weather ?? "clear",
       photoUrl: room.photoUrl ?? null,
       description: room.description ?? null,
+      hasPassword: !!room.passwordHash,
     };
+  }
+
+  private canBypassRoomPassword(
+    room: { creatorId: number | null; passwordHash?: string | null },
+    user: { id: number; role?: string },
+  ): boolean {
+    if (!room.passwordHash) return true;
+    if (user.role === "admin") return true;
+    if (room.creatorId === user.id) return true;
+    return false;
+  }
+
+  private async verifyRoomPassword(
+    room: { passwordHash?: string | null },
+    password?: string,
+  ): Promise<boolean> {
+    if (!room.passwordHash) return true;
+    if (!password) return false;
+    return bcrypt.compare(password, room.passwordHash);
+  }
+
+  private async canJoinRoom(
+    room: {
+      name: string;
+      creatorId: number | null;
+      passwordHash?: string | null;
+    },
+    user: { id: number; role?: string },
+    password?: string,
+  ): Promise<boolean> {
+    if (this.isSystemRoom(room)) return true;
+    if (this.canBypassRoomPassword(room, user)) return true;
+    return this.verifyRoomPassword(room, password);
   }
 
   private async emitRoomOnlineUpdate(roomId: number) {
@@ -127,7 +192,14 @@ export class RoomsGateway
 
       if (!isGuest && raw.lastRoomId) {
         const savedRoom = await this.dbService.getRoomById(raw.lastRoomId);
-        if (savedRoom && savedRoom.name !== "Guest Room") {
+        if (
+          savedRoom &&
+          savedRoom.name !== "Guest Room" &&
+          this.canBypassRoomPassword(savedRoom, {
+            id: raw.id ?? raw.userId,
+            role: raw.role,
+          })
+        ) {
           startRoomId = savedRoom.id;
         }
       }
@@ -205,7 +277,7 @@ export class RoomsGateway
     }
     if (user && user.roomId) {
       if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
-        const leaveMessage = `left`;
+        const leaveMessage = pickSystemMessage(LEAVE_SYSTEM_MESSAGES);
         void this.dbService
           .saveChatMessage({
             roomId: user.roomId,
@@ -246,8 +318,11 @@ export class RoomsGateway
 
   @SubscribeMessage("room:list")
   async handleRoomList(@ConnectedSocket() client: Socket) {
+    const user = this.onlineUsersService.get(client.id);
     const rooms = await this.dbService.getRooms();
-    const roomList = rooms.map((r) => this.mapRoomDto(r));
+    const roomList = rooms
+      .filter((r) => r.name !== "Guest Room" || user?.role === "admin")
+      .map((r) => this.mapRoomDto(r));
     client.emit("room:list", roomList);
   }
 
@@ -309,6 +384,7 @@ export class RoomsGateway
       description?: string;
       photoDataUrl?: string;
       removePhoto?: boolean;
+      password?: string;
     },
   ) {
     const user = this.onlineUsersService.get(client.id);
@@ -324,6 +400,7 @@ export class RoomsGateway
       name?: string;
       photoUrl?: string | null;
       description?: string | null;
+      passwordHash?: string | null;
     } = {};
 
     if (data.name !== undefined) {
@@ -354,6 +431,18 @@ export class RoomsGateway
       }
     }
 
+    if (data.password !== undefined) {
+      const next = data.password.trim();
+      if (!next) {
+        updates.passwordHash = null;
+      } else if (next.length < 4 || next.length > 50) {
+        client.emit("room:error", "Room password must be 4-50 characters");
+        return;
+      } else {
+        updates.passwordHash = await bcrypt.hash(next, 10);
+      }
+    }
+
     if (Object.keys(updates).length === 0) return;
 
     try {
@@ -368,7 +457,7 @@ export class RoomsGateway
   @SubscribeMessage("room:join")
   async handleRoomJoin(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId?: number },
+    @MessageBody() data: { roomId?: number; password?: string },
   ) {
     const user = this.onlineUsersService.get(client.id);
     if (!user || !data.roomId) return;
@@ -381,6 +470,16 @@ export class RoomsGateway
 
     if (user.isGuest && room.name !== "General Room") {
       client.emit("room:error", "Guests can only stay in General Room");
+      return;
+    }
+
+    if (room.name === "Guest Room" && user.role !== "admin") {
+      client.emit("room:error", "Not allowed");
+      return;
+    }
+
+    if (!(await this.canJoinRoom(room, user, data.password?.trim()))) {
+      client.emit("room:error", "Wrong room password");
       return;
     }
 
@@ -466,29 +565,20 @@ export class RoomsGateway
     }
 
     
-    const emotionNames: Record<string, string> = {
-      neutral: "спокоен",
-      happy: "радуется",
-      love: "влюблён",
-      laugh: "смеётся",
-      cool: "крут",
-      cry: "грустит",
-      angry: "злится",
-      sleep: "спит",
-    };
-    const emotionText = emotionNames[emotion] || emotion;
+    const emotionText = EMOTION_SYSTEM_MESSAGES[emotion];
+    if (!emotionText) return;
     await this.dbService.saveChatMessage({
       roomId: user.roomId,
       userId: null,
-      nickname: "",
-      text: `${user.nickname} ${emotionText}`,
+      nickname: user.nickname,
+      text: emotionText,
       gender: user.gender,
       isSystem: true,
     });
     this.server.to(`room:${user.roomId}`).emit("chat:message", {
       socketId: "__system__",
-      nickname: "",
-      text: `${user.nickname} ${emotionText}`,
+      nickname: user.nickname,
+      text: emotionText,
       timestamp: Date.now(),
       isSystem: true,
     });
@@ -561,6 +651,20 @@ export class RoomsGateway
     const user = this.onlineUsersService.get(client.id);
     if (!user || user.role !== "admin" || !data?.userId) return;
     await this.dbService.banUser(data.userId);
+    const targetUser = await this.dbService.getUserById(data.userId);
+    void this.dbService.writeAdminLog(
+      user.id,
+      user.nickname,
+      "ban",
+      data.userId,
+      { source: "room_context", nickname: targetUser?.nickname },
+    );
+    void this.dbService.writeUserLog(
+      data.userId,
+      "admin_ban",
+      `Забанен админом ${user.nickname}`,
+      { adminId: user.id, source: "room" },
+    );
     const target = this.onlineUsersService.getById(data.userId);
     if (target && this.server) {
       const sock = this.server.sockets.sockets.get(target.socketId);
@@ -582,7 +686,7 @@ export class RoomsGateway
     if (user.roomId) {
       
       if (next) {
-        const leaveMessage = "left";
+        const leaveMessage = pickSystemMessage(LEAVE_SYSTEM_MESSAGES);
         void this.dbService
           .saveChatMessage({
             roomId: user.roomId,
@@ -603,8 +707,7 @@ export class RoomsGateway
             });
           });
       } else {
-        
-        const joinMessage = "joined the room";
+        const joinMessage = pickSystemMessage(JOIN_SYSTEM_MESSAGES);
 
         void this.dbService
           .saveChatMessage({
@@ -737,13 +840,18 @@ export class RoomsGateway
           photoUrl: null,
         };
 
-    const usersInRoom = this.onlineUsersService
-      .getByRoom(roomId)
-      .filter(
-        (u) =>
-          u.socketId === client.id ||
-          !this.onlineUsersService.isAdminHidden(u, roomId),
-      );
+    const usersInRoom = [
+      ...this.onlineUsersService
+        .getByRoom(roomId)
+        .filter(
+          (u) =>
+            u.socketId === client.id ||
+            !this.onlineUsersService.isAdminHidden(u, roomId),
+        ),
+      ...this.botsService
+        .getBotsInRoom(roomId)
+        .map((bot) => this.botsService.toOnlineUser(bot)),
+    ];
     const sellPercent = await this.dbService.getSettingNumber(
       "sell_percent",
       50,
@@ -784,7 +892,7 @@ export class RoomsGateway
     }
 
     if (!this.onlineUsersService.isAdminHidden(user, roomId)) {
-      const joinMessage = "joined the room";
+      const joinMessage = pickSystemMessage(JOIN_SYSTEM_MESSAGES);
       await this.dbService.saveChatMessage({
         roomId,
         userId: null,

@@ -8,16 +8,12 @@ import {
 } from "@nestjs/common";
 import { FilesService } from "./files.service";
 
-
-
 @Controller("api/upload")
 export class FilesController {
   constructor(private filesService: FilesService) {}
 
   @Post("avatar")
   async uploadAvatar(@Body() body: { dataUrl?: string; userId?: number }) {
-    
-    
     if (!body.dataUrl) throw new BadRequestException("No image data");
 
     try {

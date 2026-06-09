@@ -56,6 +56,11 @@ export class Room extends Model<Room> {
   @Column(DataType.TEXT)
   description: string | null;
 
+  @Default(null)
+  @AllowNull(true)
+  @Column(DataType.STRING(255))
+  passwordHash: string | null;
+
   @ForeignKey(() => User)
   @BelongsTo(() => User, { foreignKey: "creatorId", as: "creator" })
   creator: User;

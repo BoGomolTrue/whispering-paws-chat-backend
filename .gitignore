@@ -57,3 +57,10 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 node_modules
 
 public/uploads/
+/data/chat-samples.jsonl
+/data/datasets/*.jsonl
+!/data/datasets/example.jsonl
+/data/datasets/*.json
+!/data/datasets/example.json
+/data/datasets/.cache/
+model.nlp

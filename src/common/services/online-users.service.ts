@@ -166,6 +166,12 @@ export class OnlineUsersService {
     return Array.from(this.users.values());
   }
 
+  getSocketForUser(userId: number) {
+    const user = this.getById(userId);
+    if (!user || !this.io) return undefined;
+    return this.io.sockets.sockets.get(user.socketId);
+  }
+
   updateCoins(userId: number, coins: number): void {
     const user = this.getById(userId);
     if (user && this.io) {

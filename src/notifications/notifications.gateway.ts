@@ -49,4 +49,15 @@ export class NotificationsGateway {
     const items = await this.notificationsService.markAllRead(user.id);
     client.emit("notifications:list", { items });
   }
+
+  @SubscribeMessage("notifications:dismiss")
+  async handleDismiss(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { id?: number },
+  ) {
+    const user = this.onlineUsersService.get(client.id);
+    if (!user || user.isGuest || !data?.id) return;
+    const items = await this.notificationsService.dismiss(user.id, data.id);
+    client.emit("notifications:list", { items });
+  }
 }

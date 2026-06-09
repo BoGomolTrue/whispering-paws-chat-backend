@@ -1,7 +1,10 @@
 import { Module } from "@nestjs/common";
+import { CommonModule } from "../common/common.module";
+import { DatabaseModule } from "../database/database.module";
 import { BotsService } from "./bots.service";
 
 @Module({
+  imports: [DatabaseModule, CommonModule],
   providers: [BotsService],
   exports: [BotsService],
 })
