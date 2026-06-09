@@ -823,6 +823,21 @@ export class RoomsGateway
       return;
     }
 
+    const allOnlineUsers = this.onlineUsersService.getAll();
+    for (const onlineUser of allOnlineUsers) {
+      if (
+        onlineUser.id === user.id &&
+        onlineUser.socketId !== client.id &&
+        !onlineUser.isBot
+      ) {
+        const oldSocket = this.server.sockets.sockets.get(onlineUser.socketId);
+        if (oldSocket) {
+          oldSocket.emit("force:disconnect", "duplicate");
+          oldSocket.disconnect(true);
+        }
+      }
+    }
+
     const prevRoomId = user.roomId;
     if (prevRoomId) {
       void client.leave(`room:${prevRoomId}`);
