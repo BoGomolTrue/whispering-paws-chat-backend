@@ -321,7 +321,12 @@ export class RoomsGateway
     const user = this.onlineUsersService.get(client.id);
     const rooms = await this.dbService.getRooms();
     const roomList = rooms
-      .filter((r) => r.name !== "Guest Room" || user?.role === "admin")
+      .filter(
+        (r) =>
+          r.name !== "Guest Room" ||
+          user?.role === "admin" ||
+          !!user?.isGuest,
+      )
       .map((r) => this.mapRoomDto(r));
     client.emit("room:list", roomList);
   }
@@ -468,12 +473,12 @@ export class RoomsGateway
       return;
     }
 
-    if (user.isGuest && room.name !== "General Room") {
-      client.emit("room:error", "Guests can only stay in General Room");
+    if (user.isGuest && room.name !== "Guest Room") {
+      client.emit("room:error", "Guests can only stay in Guest Room");
       return;
     }
 
-    if (room.name === "Guest Room" && user.role !== "admin") {
+    if (!user.isGuest && room.name === "Guest Room" && user.role !== "admin") {
       client.emit("room:error", "Not allowed");
       return;
     }
@@ -806,6 +811,18 @@ export class RoomsGateway
   }
 
   private async joinRoom(client: Socket, user: any, roomId: number) {
+    const targetRoom = await this.dbService.getRoomById(roomId);
+    if (!targetRoom) return;
+    if (user.isGuest && targetRoom.name !== "Guest Room") {
+      roomId = await this.dbService.getGuestRoomId();
+    } else if (
+      !user.isGuest &&
+      targetRoom.name === "Guest Room" &&
+      user.role !== "admin"
+    ) {
+      return;
+    }
+
     const prevRoomId = user.roomId;
     if (prevRoomId) {
       void client.leave(`room:${prevRoomId}`);
