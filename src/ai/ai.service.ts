@@ -270,8 +270,16 @@ export class AiService implements OnModuleInit {
       isMe: m.fromUserId === toBotId,
     }));
 
-    const sessionKey = storySessionKey(`dm:${fromUserId}:${toBotId}`, String(fromUserId));
-    const response = await this.produceReply(bot, lastText, context, sessionKey);
+    const sessionKey = storySessionKey(
+      `dm:${fromUserId}:${toBotId}`,
+      String(fromUserId),
+    );
+    const response = await this.produceReply(
+      bot,
+      lastText,
+      context,
+      sessionKey,
+    );
     return response || null;
   }
 

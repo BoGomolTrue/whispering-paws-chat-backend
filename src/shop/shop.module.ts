@@ -10,7 +10,13 @@ import { ShopGateway } from "./shop.gateway";
 import { ShopService } from "./shop.service";
 
 @Module({
-  imports: [DatabaseModule, AuthModule, NotificationsModule, BotsModule, AiModule],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    NotificationsModule,
+    BotsModule,
+    AiModule,
+  ],
   controllers: [ShopController],
   providers: [ShopService, ShopGateway, WsJwtGuard],
   exports: [ShopService],

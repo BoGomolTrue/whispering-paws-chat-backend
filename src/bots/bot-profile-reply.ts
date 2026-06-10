@@ -49,7 +49,12 @@ function buildFullProfile(bot: BotInstance): string | null {
   if (meta.length > 0) chunks.push(meta.join(", "));
   if (interests) chunks.push(interests);
   if (looking) chunks.push(`ищу ${looking}`);
-  return chunks.join(". ").replace(/\.\s*\./g, ".").trim() || null;
+  return (
+    chunks
+      .join(". ")
+      .replace(/\.\s*\./g, ".")
+      .trim() || null
+  );
 }
 
 export function buildBotProfileReply(
@@ -74,10 +79,7 @@ export function buildBotProfileReply(
       core = bot.anketa_interests?.trim() || null;
       break;
     case "ask_occupation":
-      core =
-        bot.anketa_about?.trim() ||
-        bot.anketa_interests?.trim() ||
-        null;
+      core = bot.anketa_about?.trim() || bot.anketa_interests?.trim() || null;
       break;
     case "about_self":
       core = buildFullProfile(bot);

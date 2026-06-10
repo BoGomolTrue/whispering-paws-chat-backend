@@ -45,7 +45,10 @@ const STOP_WORDS = new Set([
   "the",
 ]);
 
-export function buildRetrievalQuery(message: string, context: ChatTurn[]): string {
+export function buildRetrievalQuery(
+  message: string,
+  context: ChatTurn[],
+): string {
   const parts = [message.trim()];
   const recent = context.slice(-6);
   for (const turn of recent) {
@@ -56,7 +59,10 @@ export function buildRetrievalQuery(message: string, context: ChatTurn[]): strin
   return parts.join(" ").replace(/\s+/g, " ").trim();
 }
 
-export function extractContextKeywords(context: ChatTurn[], limit = 12): string[] {
+export function extractContextKeywords(
+  context: ChatTurn[],
+  limit = 12,
+): string[] {
   const text = context
     .slice(-8)
     .map((t) => t.text)

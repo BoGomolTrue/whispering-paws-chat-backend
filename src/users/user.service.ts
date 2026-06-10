@@ -12,7 +12,7 @@ export class UsersService {
 
   async updateProfile(userId: number, updates: any) {
     await this.dbService.updateUserProfile(userId, updates);
-    
+
     const user = this.onlineUsersService.getById(userId);
     if (user) {
       Object.assign(user, updates);
@@ -20,8 +20,6 @@ export class UsersService {
   }
 
   async changePassword(userId: number, oldPass: string, newPass: string) {
-    
-    
     const user = await this.dbService.getUserById(userId);
     if (!user || !user.password) throw new Error("User not found");
 

@@ -67,7 +67,6 @@ export class ShopService {
     );
     const refund = Math.round((item.price * sellPercent) / 100);
 
-    
     if (user.equipped[item.category] === itemId) {
       user.equipped[item.category] = null;
       user.equippedColors[item.category] = null;

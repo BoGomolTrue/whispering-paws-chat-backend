@@ -19,6 +19,8 @@ import { UserFriend } from "./models/user-friend.model";
 import { ProfilePost } from "./models/profile-post.model";
 import { ProfilePostComment } from "./models/profile-post-comment.model";
 import { SupportMessage } from "./models/support-message.model";
+import { PromoCode } from "./models/promo-code.model";
+import { PromoCodeRedemption } from "./models/promo-code-redemption.model";
 
 @Global()
 @Module({
@@ -46,6 +48,8 @@ import { SupportMessage } from "./models/support-message.model";
           ProfilePost,
           ProfilePostComment,
           SupportMessage,
+          PromoCode,
+          PromoCodeRedemption,
         ],
         autoLoadModels: true,
         synchronize: configService.get("NODE_ENV") !== "production",
@@ -72,6 +76,8 @@ import { SupportMessage } from "./models/support-message.model";
       ProfilePost,
       ProfilePostComment,
       SupportMessage,
+      PromoCode,
+      PromoCodeRedemption,
     ]),
   ],
   providers: [DatabaseService],

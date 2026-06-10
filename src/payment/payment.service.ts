@@ -82,7 +82,9 @@ export class PaymentService {
           const referrerNewCoins = referrer.coins + bonus;
           await this.dbService.updateUserCoins(referrer.id, referrerNewCoins);
           this.creditCoinsToOnlineUser(referrer.id, referrerNewCoins);
-          this.logger.log(`VK Pay referral bonus: +${bonus} coins → ${referrer.nickname}`);
+          this.logger.log(
+            `VK Pay referral bonus: +${bonus} coins → ${referrer.nickname}`,
+          );
         }
         await user.update({ referralBonusPaid: true });
       }
@@ -157,7 +159,9 @@ export class PaymentService {
         const referrerNewCoins = referrer.coins + bonus;
         await this.dbService.updateUserCoins(referrer.id, referrerNewCoins);
         this.creditCoinsToOnlineUser(referrer.id, referrerNewCoins);
-        this.logger.log(`YooMoney referral bonus: +${bonus} coins → ${referrer.nickname}`);
+        this.logger.log(
+          `YooMoney referral bonus: +${bonus} coins → ${referrer.nickname}`,
+        );
       }
       const userRecord = await this.dbService.findUserById(userId);
       if (userRecord) {
@@ -297,7 +301,9 @@ export class PaymentService {
           const referrerNewCoins = referrer.coins + bonus;
           await this.dbService.updateUserCoins(referrer.id, referrerNewCoins);
           this.creditCoinsToOnlineUser(referrer.id, referrerNewCoins);
-          this.logger.log(`TG Stars referral bonus: +${bonus} coins → ${referrer.nickname}`);
+          this.logger.log(
+            `TG Stars referral bonus: +${bonus} coins → ${referrer.nickname}`,
+          );
         }
         const userRecord = await this.dbService.findUserById(userId);
         if (userRecord) {
@@ -313,10 +319,6 @@ export class PaymentService {
     const user = this.onlineUsersService.getById(userId);
     if (user) {
       user.coins = coins;
-      
-      
-      
-      
     }
   }
 }

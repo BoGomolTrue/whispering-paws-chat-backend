@@ -259,4 +259,6 @@ export const GREETING_ONLY_RE =
 export const GREETING_RE =
   /^(?:привет|прив|хай|хей|здаров\w*|йо|ку|хелло|салют|здорово|добрый\s+(?:день|вечер|утро))(?:\s|$|[,.!?])/i;
 
-export const ABOUT_SELF_RE = INTENT_RULES.find((r) => r.intent === "about_self")!.re;
+export const ABOUT_SELF_RE = INTENT_RULES.find(
+  (r) => r.intent === "about_self",
+)!.re;

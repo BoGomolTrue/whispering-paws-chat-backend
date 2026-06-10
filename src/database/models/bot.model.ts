@@ -76,7 +76,10 @@ export class Bot extends Model<Bot> {
   @Default({})
   @AllowNull(false)
   @Column(DataType.JSON)
-  equipped: Record<string, { itemId: string; color: string | null } | undefined>;
+  equipped: Record<
+    string,
+    { itemId: string; color: string | null } | undefined
+  >;
 
   @Default(null)
   @Column(DataType.TEXT)

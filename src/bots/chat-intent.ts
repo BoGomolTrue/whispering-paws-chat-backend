@@ -18,7 +18,11 @@ import {
   type ChatIntent,
 } from "./chat-intents.constant";
 
-export { CHAT_INTENTS, PROFILE_INTENTS, type ChatIntent } from "./chat-intents.constant";
+export {
+  CHAT_INTENTS,
+  PROFILE_INTENTS,
+  type ChatIntent,
+} from "./chat-intents.constant";
 
 const LANG = "ru";
 const MIN_SCORE = 0.52;
@@ -82,17 +86,27 @@ export async function initChatIntent(
   });
   const seen = new Set<string>();
 
-  nlp.addNamedEntityText("ru", "time", "ru", ["ru"], ["5 вечера", "17:00", "18:30", "7 утра"]);
-  nlp.addNamedEntityText("ru", "date", "ru", ["ru"], ["вчера", "сегодня", "завтра", "позавчера"]);
-  nlp.addNamedEntityText("ru", "location", "ru", ["ru"], [
-    "москве",
-    "москва",
-    "спб",
-    "питере",
-    "екб",
-    "новосибе",
-    "казани",
-  ]);
+  nlp.addNamedEntityText(
+    "ru",
+    "time",
+    "ru",
+    ["ru"],
+    ["5 вечера", "17:00", "18:30", "7 утра"],
+  );
+  nlp.addNamedEntityText(
+    "ru",
+    "date",
+    "ru",
+    ["ru"],
+    ["вчера", "сегодня", "завтра", "позавчера"],
+  );
+  nlp.addNamedEntityText(
+    "ru",
+    "location",
+    "ru",
+    ["ru"],
+    ["москве", "москва", "спб", "питере", "екб", "новосибе", "казани"],
+  );
 
   for (const { intent, text } of ENTITY_TRAIN) {
     nlp.addDocument(LANG, text, intent);

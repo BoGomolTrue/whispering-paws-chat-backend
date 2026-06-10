@@ -47,7 +47,8 @@ export class SupportController {
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Req() req: Request,
-    @Body() body: { category?: string; message?: string; imageDataUrl?: string },
+    @Body()
+    body: { category?: string; message?: string; imageDataUrl?: string },
   ) {
     const user = await this.requireUser(req);
     const category = (body.category ?? "").trim();
@@ -67,13 +68,18 @@ export class SupportController {
 
     const recent = await this.dbService.getLatestSupportMessageAt(user.id);
     if (recent && Date.now() - recent < 60_000) {
-      throw new BadRequestException("Please wait before sending another message");
+      throw new BadRequestException(
+        "Please wait before sending another message",
+      );
     }
 
     let imageUrl: string | null = null;
     if (imageDataUrl) {
       try {
-        imageUrl = await this.filesService.saveSupportImage(imageDataUrl, user.id);
+        imageUrl = await this.filesService.saveSupportImage(
+          imageDataUrl,
+          user.id,
+        );
       } catch {
         throw new BadRequestException("Invalid image");
       }

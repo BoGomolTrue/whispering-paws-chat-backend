@@ -1,4 +1,9 @@
-export const BADGE_IDS = ["first_message", "messages_10", "streak_7", "first_friend"] as const;
+export const BADGE_IDS = [
+  "first_message",
+  "messages_10",
+  "streak_7",
+  "first_friend",
+] as const;
 export type BadgeId = (typeof BADGE_IDS)[number];
 
 export const BADGE_LABEL_KEYS: Record<BadgeId, string> = {

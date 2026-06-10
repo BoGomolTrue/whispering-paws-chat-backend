@@ -133,7 +133,7 @@ export class UsersGateway {
             avatar: user.anketa_avatar,
           },
         });
-        
+
         const text = `edited_anketa [anketa:${user.id}]`;
         await this.dbService.saveChatMessage({
           roomId: user.roomId,
@@ -360,10 +360,31 @@ export class UsersGateway {
     targetUserId: number,
   ) {
     const target = await this.dbService.getUserById(targetUserId);
-    if (!target || target.isGuest) {
+    const online = this.onlineUsersService.getById(targetUserId);
+    const isGuestTarget = target?.isGuest === true || online?.isGuest === true;
+
+    if (!target && !online) {
       client.emit("profile:error", "User not found");
       return;
     }
+
+    if (isGuestTarget) {
+      client.emit("profile:viewData", {
+        userId: targetUserId,
+        friends: [],
+        posts: [],
+        rooms: [],
+        isFriend: false,
+        isOwn: targetUserId === viewerId,
+      });
+      return;
+    }
+
+    if (!target) {
+      client.emit("profile:error", "User not found");
+      return;
+    }
+
     const friends = await this.dbService.listUserFriends(targetUserId);
     const posts = await this.dbService.listProfilePosts(targetUserId);
     const rooms = await this.dbService.listUserCreatedRooms(targetUserId);

@@ -10,10 +10,7 @@ export type RoomOccupant = { socketId: string; x: number };
 export type SpawnBand = { min: number; max: number };
 
 export function clampRoomX(x: number): number {
-  return Math.max(
-    BOT_WORLD_X_MIN,
-    Math.min(BOT_WORLD_X_MAX, Math.round(x)),
-  );
+  return Math.max(BOT_WORLD_X_MIN, Math.min(BOT_WORLD_X_MAX, Math.round(x)));
 }
 
 export function isTooClose(
@@ -93,7 +90,9 @@ export function resolveMoveTarget(
       for (const sign of delta === 0 ? [0] : [-1, 1]) {
         const candidate = clampRoomX(target + sign * delta);
         if (isTooClose(candidate, others, excludeSocketId, gap)) continue;
-        const spread = Math.min(...others.map((o) => Math.abs(candidate - o.x)));
+        const spread = Math.min(
+          ...others.map((o) => Math.abs(candidate - o.x)),
+        );
         const score = spread * 3 - Math.abs(candidate - target);
         if (score > bestScore) {
           bestScore = score;
@@ -101,10 +100,7 @@ export function resolveMoveTarget(
         }
       }
     }
-    if (
-      best !== currentX &&
-      !isTooClose(best, others, excludeSocketId, gap)
-    ) {
+    if (best !== currentX && !isTooClose(best, others, excludeSocketId, gap)) {
       return best;
     }
   }

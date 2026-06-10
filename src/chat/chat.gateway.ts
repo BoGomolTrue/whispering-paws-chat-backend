@@ -54,7 +54,6 @@ export class ChatGateway {
     this.onlineUsersService.touchActivity(client.id);
     const text = msg.text.trim().substring(0, 500);
 
-    
     const saved = await this.dbService.saveChatMessage({
       roomId: user.roomId,
       userId: user.isGuest ? null : user.id,
@@ -75,12 +74,18 @@ export class ChatGateway {
         user.coins = quest.coins;
         user.badges = quest.badges;
         user.starterQuestStep = quest.step;
-        client.emit("starterQuest:complete", { coins: quest.coins, reward: STARTER_QUEST_REWARD });
+        client.emit("starterQuest:complete", {
+          coins: quest.coins,
+          reward: STARTER_QUEST_REWARD,
+        });
         client.emit("badges:updated", { badges: quest.badges });
       } else {
         const count = await this.dbService.countUserChatMessages(user.id);
         if (count >= 10) {
-          const badges = await this.dbService.grantBadge(user.id, "messages_10");
+          const badges = await this.dbService.grantBadge(
+            user.id,
+            "messages_10",
+          );
           if (badges) {
             user.badges = badges;
             client.emit("badges:updated", { badges });
@@ -128,7 +133,9 @@ export class ChatGateway {
     if (!user || user.isGuest || data?.toUserId == null) return;
     this.onlineUsersService.touchActivity(client.id);
     const payload = { socketId: client.id, nickname: user.nickname };
-    const bot = this.botsService.getAllBots().find((b) => b.id === data.toUserId);
+    const bot = this.botsService
+      .getAllBots()
+      .find((b) => b.id === data.toUserId);
     if (bot) return;
     const recipient = this.onlineUsersService.getById(data.toUserId);
     if (!recipient || recipient.isGuest) return;
@@ -261,7 +268,9 @@ export class ChatGateway {
     const text = (data.text ?? "").trim().substring(0, 500);
     if (!text) return;
 
-    const bot = this.botsService.getAllBots().find((b) => b.id === data.toUserId);
+    const bot = this.botsService
+      .getAllBots()
+      .find((b) => b.id === data.toUserId);
     if (bot) {
       const saved = await this.dbService.saveDirectMessage(
         user.id,
@@ -277,7 +286,11 @@ export class ChatGateway {
         timestamp: parseInt(saved.timestamp, 10),
       };
       client.emit("dm:message", msg);
-      const reply = await this.aiService.handleDm(user.id, user.nickname, data.toUserId);
+      const reply = await this.aiService.handleDm(
+        user.id,
+        user.nickname,
+        data.toUserId,
+      );
       if (reply) {
         void this.botsService.deliverDmMessage(
           client,
@@ -290,7 +303,10 @@ export class ChatGateway {
       return;
     }
 
-    const hadIncoming = await this.dbService.hasIncomingDm(data.toUserId, user.id);
+    const hadIncoming = await this.dbService.hasIncomingDm(
+      data.toUserId,
+      user.id,
+    );
     const saved = await this.dbService.saveDirectMessage(
       user.id,
       data.toUserId,
@@ -315,16 +331,23 @@ export class ChatGateway {
       if (sock) sock.emit("dm:message", msg);
     }
     if (hadIncoming) {
-      const senderBadges = await this.dbService.grantBadge(user.id, "first_friend");
+      const senderBadges = await this.dbService.grantBadge(
+        user.id,
+        "first_friend",
+      );
       if (senderBadges) {
         user.badges = senderBadges;
         client.emit("badges:updated", { badges: senderBadges });
       }
-      const partnerBadges = await this.dbService.grantBadge(data.toUserId, "first_friend");
+      const partnerBadges = await this.dbService.grantBadge(
+        data.toUserId,
+        "first_friend",
+      );
       if (partnerBadges && recipient) {
         recipient.badges = partnerBadges;
         const partnerSock = this.server.sockets.sockets.get(recipient.socketId);
-        if (partnerSock) partnerSock.emit("badges:updated", { badges: partnerBadges });
+        if (partnerSock)
+          partnerSock.emit("badges:updated", { badges: partnerBadges });
       }
     }
     const fromLast = await this.dbService.getLastDmFrom(data.toUserId);

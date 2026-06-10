@@ -69,10 +69,15 @@ export class ShopGateway {
     try {
       const result = await this.shopService.buyItem(user.id, itemId, color);
       client.emit("shop:bought", { itemId, coins: result.coins, color });
-      void this.dbService.writeUserLog(user.id, "shop_buy", `Покупка: ${itemId}`, {
-        itemId,
-        coins: result.coins,
-      });
+      void this.dbService.writeUserLog(
+        user.id,
+        "shop_buy",
+        `Покупка: ${itemId}`,
+        {
+          itemId,
+          coins: result.coins,
+        },
+      );
       if (!user.ownedItems.includes(itemId)) {
         user.ownedItems.push(itemId);
       }
@@ -102,11 +107,16 @@ export class ShopGateway {
         coins: result.coins,
         refund: result.refund,
       });
-      void this.dbService.writeUserLog(user.id, "shop_sell", `Продажа: ${itemId}`, {
-        itemId,
-        refund: result.refund,
-        coins: result.coins,
-      });
+      void this.dbService.writeUserLog(
+        user.id,
+        "shop_sell",
+        `Продажа: ${itemId}`,
+        {
+          itemId,
+          refund: result.refund,
+          coins: result.coins,
+        },
+      );
       user.ownedItems = user.ownedItems.filter((id) => id !== itemId);
       if (wasEquipped && user.roomId) {
         client.to(`room:${user.roomId}`).emit("user:equip", {
@@ -179,10 +189,15 @@ export class ShopGateway {
         itemId: result.itemId,
         coins: result.coins,
       });
-      void this.dbService.writeUserLog(user.id, "gift_sent", `Подарок ${result.itemId} → ${recipient.nickname}`, {
-        toUserId: data.toUserId,
-        itemId: result.itemId,
-      });
+      void this.dbService.writeUserLog(
+        user.id,
+        "gift_sent",
+        `Подарок ${result.itemId} → ${recipient.nickname}`,
+        {
+          toUserId: data.toUserId,
+          itemId: result.itemId,
+        },
+      );
       void this.dbService.writeUserLog(
         data.toUserId,
         "gift_received",
@@ -191,7 +206,11 @@ export class ShopGateway {
       );
 
       if (user.roomId) {
-        await this.emitGiftChatMessage(user, recipient.nickname, result.itemName);
+        await this.emitGiftChatMessage(
+          user,
+          recipient.nickname,
+          result.itemName,
+        );
       }
     } catch (e) {
       client.emit("shop:error", e instanceof Error ? e.message : "Error");
@@ -200,11 +219,15 @@ export class ShopGateway {
 
   private async handleBotGift(
     client: Socket,
-    user: { id: number; nickname: string; gender: string | null; roomId: number },
+    user: {
+      id: number;
+      nickname: string;
+      gender: string | null;
+      roomId: number;
+    },
     bot: BotInstance,
     itemId: string,
   ) {
-
     if (bot.ownedItems.includes(itemId)) {
       client.emit("shop:error", "User already has this item");
       return;

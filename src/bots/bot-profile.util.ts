@@ -12,7 +12,10 @@ export type BotProfileInput = {
   inventoryValue?: number;
   badges?: string[];
   ownedItems?: string[];
-  equipped?: Record<string, { itemId: string; color: string | null } | undefined>;
+  equipped?: Record<
+    string,
+    { itemId: string; color: string | null } | undefined
+  >;
   anketa_about?: string | null;
   anketa_city?: string | null;
   anketa_interests?: string | null;
@@ -29,13 +32,18 @@ export function normalizeBotProfileInput(raw: BotProfileInput) {
     gender: raw.gender?.trim() || "female",
     eyeColor: raw.eyeColor?.trim() || "#8E44AD",
     status: raw.status?.trim() ?? "",
-    coins: Number.isFinite(raw.coins) ? Math.max(0, Math.floor(raw.coins!)) : 100,
+    coins: Number.isFinite(raw.coins)
+      ? Math.max(0, Math.floor(raw.coins!))
+      : 100,
     inventoryValue: Number.isFinite(raw.inventoryValue)
       ? Math.max(0, Math.floor(raw.inventoryValue!))
       : 0,
     badges: Array.isArray(raw.badges) ? raw.badges.filter(Boolean) : [],
-    ownedItems: Array.isArray(raw.ownedItems) ? raw.ownedItems.filter(Boolean) : [],
-    equipped: raw.equipped && typeof raw.equipped === "object" ? raw.equipped : {},
+    ownedItems: Array.isArray(raw.ownedItems)
+      ? raw.ownedItems.filter(Boolean)
+      : [],
+    equipped:
+      raw.equipped && typeof raw.equipped === "object" ? raw.equipped : {},
     anketa_about: raw.anketa_about?.trim() || null,
     anketa_city: raw.anketa_city?.trim() || null,
     anketa_interests: raw.anketa_interests?.trim() || null,

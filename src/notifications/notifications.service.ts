@@ -167,9 +167,19 @@ export class NotificationsService {
   async onGiftReceived(
     client: Socket,
     userId: number,
-    payload: { fromNickname: string; itemId: string; itemName: string; fromUserId: number },
+    payload: {
+      fromNickname: string;
+      itemId: string;
+      itemName: string;
+      fromUserId: number;
+    },
   ): Promise<void> {
-    await this.pushNotification(client, userId, NOTIFICATION_TYPE_GIFT, payload);
+    await this.pushNotification(
+      client,
+      userId,
+      NOTIFICATION_TYPE_GIFT,
+      payload,
+    );
   }
 
   private async pushNotification(

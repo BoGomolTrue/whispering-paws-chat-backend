@@ -23,11 +23,7 @@ import {
 
 const BOT_ID_OFFSET = 900000;
 
-function recordToInstance(
-  row: Bot,
-  x?: number,
-  y?: number,
-): BotInstance {
+function recordToInstance(row: Bot, x?: number, y?: number): BotInstance {
   const profile = botRowToProfileFields(row);
   return {
     id: BOT_ID_OFFSET + row.id,
@@ -188,12 +184,17 @@ export class BotsService implements OnModuleDestroy {
 
   async spawnBotRecord(row: Bot): Promise<BotInstance | null> {
     if (row.hidden) return null;
-    const x = findSpawnX(this.getRoomOccupants(row.roomId), this.getSpawnBand(row.roomId));
+    const x = findSpawnX(
+      this.getRoomOccupants(row.roomId),
+      this.getSpawnBand(row.roomId),
+    );
     const bot = recordToInstance(row, x, 0);
     this.bots.set(bot.socketId, bot);
     if (this.running) {
       this.scheduleBotActivities(bot);
-      this.io?.to(`room:${bot.roomId}`).emit("user:join", this.toOnlineUser(bot));
+      this.io
+        ?.to(`room:${bot.roomId}`)
+        .emit("user:join", this.toOnlineUser(bot));
       this.emitBotJoinSystemMessage(bot);
     }
     return bot;
@@ -206,15 +207,14 @@ export class BotsService implements OnModuleDestroy {
       return;
     }
     const old = this.getBotById(runtimeId);
-    const keepPos =
-      old && old.roomId === row.roomId && !Number.isNaN(old.x);
+    const keepPos = old && old.roomId === row.roomId && !Number.isNaN(old.x);
     const x = keepPos
-      ? old!.x
+      ? old.x
       : findSpawnX(
           this.getRoomOccupants(row.roomId),
           this.getSpawnBand(row.roomId),
         );
-    const bot = recordToInstance(row, x, keepPos ? old!.y : 0);
+    const bot = recordToInstance(row, x, keepPos ? old.y : 0);
     if (old) {
       this.bots.delete(old.socketId);
       if (old.roomId !== bot.roomId) {
@@ -224,7 +224,9 @@ export class BotsService implements OnModuleDestroy {
     }
     this.bots.set(bot.socketId, bot);
     if (this.running && this.io) {
-      this.io.to(`room:${bot.roomId}`).emit("user:join", this.toOnlineUser(bot));
+      this.io
+        .to(`room:${bot.roomId}`)
+        .emit("user:join", this.toOnlineUser(bot));
       if (!old) {
         this.scheduleBotActivities(bot);
         this.emitBotJoinSystemMessage(bot);

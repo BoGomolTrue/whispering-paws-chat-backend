@@ -34,7 +34,9 @@ export function extractChatEntities(text: string): ChatEntities {
     }
   }
 
-  const isoDate = text.match(/\b(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?\b/);
+  const isoDate = text.match(
+    /\b(\d{1,2})[.\-/](\d{1,2})(?:[.\-/](\d{2,4}))?\b/,
+  );
   if (isoDate) {
     date = isoDate[0];
     tokens.push(isoDate[0]);
@@ -67,7 +69,11 @@ export function extractChatEntities(text: string): ChatEntities {
 
 export function mergeNlpEntities(
   base: ChatEntities,
-  nlpEntities: Array<{ entity?: string; utterance?: string; sourceText?: string }>,
+  nlpEntities: Array<{
+    entity?: string;
+    utterance?: string;
+    sourceText?: string;
+  }>,
 ): ChatEntities {
   const out = { ...base, tokens: [...base.tokens] };
   for (const e of nlpEntities) {
@@ -83,7 +89,9 @@ export function mergeNlpEntities(
       out.tokens.push(val);
     }
     if (
-      (name.includes("location") || name.includes("place") || name.includes("city")) &&
+      (name.includes("location") ||
+        name.includes("place") ||
+        name.includes("city")) &&
       !out.location
     ) {
       out.location = val.toLowerCase();

@@ -11,7 +11,16 @@ import { ShopModule } from "../shop/shop.module";
 import { RoomsGateway } from "./rooms.gateway";
 
 @Module({
-  imports: [DatabaseModule, AuthModule, ShopModule, PaymentModule, NotificationsModule, FilesModule, BotsModule, AiModule],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    ShopModule,
+    PaymentModule,
+    NotificationsModule,
+    FilesModule,
+    BotsModule,
+    AiModule,
+  ],
   providers: [RoomsGateway, WsJwtGuard],
   exports: [RoomsGateway],
 })

@@ -12,7 +12,11 @@ import {
   isProfileIntent,
   type ChatIntent,
 } from "./chat-intent";
-import { alignReplyGender, resolveBotGender, type BotSpeechGender } from "./bot-gender";
+import {
+  alignReplyGender,
+  resolveBotGender,
+  type BotSpeechGender,
+} from "./bot-gender";
 import { buildBotProfileReply } from "./bot-profile-reply";
 import {
   isStoryContinuation,
@@ -109,7 +113,11 @@ async function searchScenario(
   return tryHumanized(pick, scenario, options.botGender);
 }
 
-function finishStoryReply(sessionKey: string | undefined, hadStory: boolean, text: string): string {
+function finishStoryReply(
+  sessionKey: string | undefined,
+  hadStory: boolean,
+  text: string,
+): string {
   if (sessionKey && hadStory && text) markStoryBotReply(sessionKey);
   return text;
 }
@@ -193,7 +201,12 @@ export async function pickRetrievalReply(
     }
 
     if (storyActive) {
-      reply = await searchScenario(index, message, "sharing_personal_story", options);
+      reply = await searchScenario(
+        index,
+        message,
+        "sharing_personal_story",
+        options,
+      );
       if (reply) return finishStoryReply(sessionKey, storyActive, reply);
     }
 
@@ -201,7 +214,8 @@ export async function pickRetrievalReply(
     if (casualRanked.length > 0) {
       const pick = index.pickWeightedReply(casualRanked, options.botGender);
       const humanized = tryHumanized(pick, "small_talk", options.botGender);
-      if (humanized) return finishStoryReply(sessionKey, storyActive, humanized);
+      if (humanized)
+        return finishStoryReply(sessionKey, storyActive, humanized);
     }
   }
 

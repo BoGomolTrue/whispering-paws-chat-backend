@@ -39,10 +39,9 @@ export class AuthController {
 
   @Get("me")
   async me(@Req() req: Request, @Res() res: Response) {
-    
     const authHeader = req.headers.authorization;
     let token: string | undefined;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith("Bearer ")) {
       token = authHeader.substring(7);
     } else {
       token = req.cookies?.token;
@@ -129,7 +128,11 @@ export class AuthController {
 
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() dto: RegisterDto, @Req() req: Request, @Res() res: Response) {
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     const existing = await this.dbService.findUserByEmail(dto.email);
     if (existing) throw new BadRequestException("Email already registered");
     const nickExists = await this.dbService.findUserByNickname(

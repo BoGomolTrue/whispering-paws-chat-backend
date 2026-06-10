@@ -8,7 +8,10 @@ import {
   isReferralAllowed,
   type ReferralContext,
 } from "../common/utils/referral.util";
-import { BotProfileInput, normalizeBotProfileInput } from "../bots/bot-profile.util";
+import {
+  BotProfileInput,
+  normalizeBotProfileInput,
+} from "../bots/bot-profile.util";
 import {
   DAILY_QUESTS,
   getQuestProgress,
@@ -21,6 +24,8 @@ import { UserFriend } from "./models/user-friend.model";
 import { ProfilePost } from "./models/profile-post.model";
 import { ProfilePostComment } from "./models/profile-post-comment.model";
 import { SupportMessage } from "./models/support-message.model";
+import { PromoCode } from "./models/promo-code.model";
+import { PromoCodeRedemption } from "./models/promo-code-redemption.model";
 import { ChatMessage } from "./models/chat-message.model";
 import { DirectMessage } from "./models/direct-message.model";
 import { Notification } from "./models/notification.model";
@@ -98,6 +103,9 @@ export class DatabaseService implements OnModuleInit {
     private profilePostCommentRepository: typeof ProfilePostComment,
     @InjectModel(SupportMessage)
     private supportMessageRepository: typeof SupportMessage,
+    @InjectModel(PromoCode) private promoCodeRepository: typeof PromoCode,
+    @InjectModel(PromoCodeRedemption)
+    private promoCodeRedemptionRepository: typeof PromoCodeRedemption,
   ) {}
 
   async onModuleInit() {
@@ -1013,9 +1021,11 @@ export class DatabaseService implements OnModuleInit {
     });
   }
 
-  async getReferralStats(
-    userId: number,
-  ): Promise<{ code: string | null; referredCount: number; salaryBonusPercent: number }> {
+  async getReferralStats(userId: number): Promise<{
+    code: string | null;
+    referredCount: number;
+    salaryBonusPercent: number;
+  }> {
     const user = await this.userRepository.findByPk(userId, { raw: true });
     if (!user) return { code: null, referredCount: 0, salaryBonusPercent: 0 };
 
@@ -1145,11 +1155,16 @@ export class DatabaseService implements OnModuleInit {
       badges: data.badges ?? row.badges,
       ownedItems: data.ownedItems ?? row.ownedItems,
       equipped: data.equipped ?? row.equipped,
-      anketa_about: data.anketa_about !== undefined ? data.anketa_about : row.anketa_about,
-      anketa_city: data.anketa_city !== undefined ? data.anketa_city : row.anketa_city,
+      anketa_about:
+        data.anketa_about !== undefined ? data.anketa_about : row.anketa_about,
+      anketa_city:
+        data.anketa_city !== undefined ? data.anketa_city : row.anketa_city,
       anketa_interests:
-        data.anketa_interests !== undefined ? data.anketa_interests : row.anketa_interests,
-      anketa_age: data.anketa_age !== undefined ? data.anketa_age : row.anketa_age,
+        data.anketa_interests !== undefined
+          ? data.anketa_interests
+          : row.anketa_interests,
+      anketa_age:
+        data.anketa_age !== undefined ? data.anketa_age : row.anketa_age,
       anketa_looking_for:
         data.anketa_looking_for !== undefined
           ? data.anketa_looking_for
@@ -1314,7 +1329,12 @@ export class DatabaseService implements OnModuleInit {
       offset,
       raw: true,
     });
-    return { items: rows, total: count, page: Math.max(page, 1), limit: safeLimit };
+    return {
+      items: rows,
+      total: count,
+      page: Math.max(page, 1),
+      limit: safeLimit,
+    };
   }
 
   async getUserLogs(userId: number, page = 1, limit = 30) {
@@ -1327,7 +1347,12 @@ export class DatabaseService implements OnModuleInit {
       offset,
       raw: true,
     });
-    return { items: rows, total: count, page: Math.max(page, 1), limit: safeLimit };
+    return {
+      items: rows,
+      total: count,
+      page: Math.max(page, 1),
+      limit: safeLimit,
+    };
   }
 
   async createSupportMessage(
@@ -1368,22 +1393,25 @@ export class DatabaseService implements OnModuleInit {
     return new Date(row.createdAt as string | Date).getTime();
   }
 
-  async listSupportMessagesAdmin(
-    page = 1,
-    limit = 30,
-    unreadOnly = false,
-  ) {
+  async listSupportMessagesAdmin(page = 1, limit = 30, unreadOnly = false) {
     const safeLimit = Math.min(Math.max(limit, 1), 100);
     const offset = (Math.max(page, 1) - 1) * safeLimit;
     const where = unreadOnly ? { read: false } : {};
-    const { rows, count } = await this.supportMessageRepository.findAndCountAll({
-      where,
-      order: [["createdAt", "DESC"]],
+    const { rows, count } = await this.supportMessageRepository.findAndCountAll(
+      {
+        where,
+        order: [["createdAt", "DESC"]],
+        limit: safeLimit,
+        offset,
+        raw: true,
+      },
+    );
+    return {
+      items: rows,
+      total: count,
+      page: Math.max(page, 1),
       limit: safeLimit,
-      offset,
-      raw: true,
-    });
-    return { items: rows, total: count, page: Math.max(page, 1), limit: safeLimit };
+    };
   }
 
   async countUnreadSupportMessages(): Promise<number> {
@@ -1413,7 +1441,8 @@ export class DatabaseService implements OnModuleInit {
     if (!loaded) return null;
     const r = row as any;
     const badges = await this.getUserBadges(userId);
-    const equipped: Record<string, { itemId: string; color: string | null }> = {};
+    const equipped: Record<string, { itemId: string; color: string | null }> =
+      {};
     for (const [cat, itemId] of Object.entries(loaded.equipped)) {
       if (itemId) {
         equipped[cat] = {
@@ -1467,7 +1496,10 @@ export class DatabaseService implements OnModuleInit {
     return true;
   }
 
-  async adminGrantItem(userId: number, itemId: string): Promise<string[] | null> {
+  async adminGrantItem(
+    userId: number,
+    itemId: string,
+  ): Promise<string[] | null> {
     if (!getShopItemById(itemId)) return null;
     const user = await this.userRepository.findByPk(userId);
     if (!user) return null;
@@ -1483,7 +1515,10 @@ export class DatabaseService implements OnModuleInit {
     return items.map((i: any) => i.itemId as string);
   }
 
-  async adminRemoveItem(userId: number, itemId: string): Promise<string[] | null> {
+  async adminRemoveItem(
+    userId: number,
+    itemId: string,
+  ): Promise<string[] | null> {
     const user = await this.userRepository.findByPk(userId);
     if (!user) return null;
     const existing = await this.userItemRepository.findOne({
@@ -1536,7 +1571,13 @@ export class DatabaseService implements OnModuleInit {
     const friendIds = rows.map((r: any) => r.friendId as number);
     const users = await this.userRepository.findAll({
       where: { id: friendIds },
-      attributes: ["id", "nickname", "characterType", "gender", "anketa_avatar"],
+      attributes: [
+        "id",
+        "nickname",
+        "characterType",
+        "gender",
+        "anketa_avatar",
+      ],
       raw: true,
     });
     const byId = new Map(users.map((u: any) => [u.id as number, u]));
@@ -1613,7 +1654,9 @@ export class DatabaseService implements OnModuleInit {
       order: [["createdAt", "ASC"]],
       raw: true,
     });
-    const authorIds = [...new Set(commentRows.map((c: any) => c.userId as number))];
+    const authorIds = [
+      ...new Set(commentRows.map((c: any) => c.userId as number)),
+    ];
     const authors = authorIds.length
       ? await this.userRepository.findAll({
           where: { id: authorIds },
@@ -1624,14 +1667,17 @@ export class DatabaseService implements OnModuleInit {
     const nickById = new Map(
       authors.map((u: any) => [u.id as number, u.nickname as string]),
     );
-    const commentsByPost = new Map<number, Array<{
-      id: number;
-      postId: number;
-      userId: number;
-      nickname: string;
-      text: string;
-      createdAt: unknown;
-    }>>();
+    const commentsByPost = new Map<
+      number,
+      Array<{
+        id: number;
+        postId: number;
+        userId: number;
+        nickname: string;
+        text: string;
+        createdAt: unknown;
+      }>
+    >();
     for (const row of commentRows as any[]) {
       const postId = row.postId as number;
       const list = commentsByPost.get(postId) ?? [];
@@ -1654,7 +1700,11 @@ export class DatabaseService implements OnModuleInit {
     }));
   }
 
-  async createProfilePost(userId: number, text: string, imageUrl: string | null = null) {
+  async createProfilePost(
+    userId: number,
+    text: string,
+    imageUrl: string | null = null,
+  ) {
     const row = await this.profilePostRepository.create({
       userId,
       text,
@@ -1676,7 +1726,9 @@ export class DatabaseService implements OnModuleInit {
   }
 
   async createProfilePostComment(userId: number, postId: number, text: string) {
-    const post = await this.profilePostRepository.findByPk(postId, { raw: true });
+    const post = await this.profilePostRepository.findByPk(postId, {
+      raw: true,
+    });
     if (!post) return null;
     const row = await this.profilePostCommentRepository.create({
       postId,
@@ -1704,20 +1756,209 @@ export class DatabaseService implements OnModuleInit {
     userId: number,
     commentId: number,
   ): Promise<{ ok: boolean; postOwnerId?: number }> {
-    const comment = await this.profilePostCommentRepository.findByPk(commentId, {
-      raw: true,
-    });
+    const comment = await this.profilePostCommentRepository.findByPk(
+      commentId,
+      {
+        raw: true,
+      },
+    );
     if (!comment) return { ok: false };
-    const post = await this.profilePostRepository.findByPk((comment as any).postId, {
-      raw: true,
-    });
+    const post = await this.profilePostRepository.findByPk(
+      (comment as any).postId,
+      {
+        raw: true,
+      },
+    );
     if (!post) return { ok: false };
     const postOwnerId = (post as any).userId as number;
     const commentUserId = (comment as any).userId as number;
     if (commentUserId !== userId && postOwnerId !== userId) {
       return { ok: false };
     }
-    await this.profilePostCommentRepository.destroy({ where: { id: commentId } });
+    await this.profilePostCommentRepository.destroy({
+      where: { id: commentId },
+    });
     return { ok: true, postOwnerId };
+  }
+
+  private normalizePromoCode(raw: string): string {
+    return raw.trim().toUpperCase().replace(/\s+/g, "");
+  }
+
+  private generatePromoCodeValue(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let suffix = "";
+    for (let i = 0; i < 6; i++) {
+      suffix += chars[randomBytes(1)[0] % chars.length];
+    }
+    return `WP-${suffix}`;
+  }
+
+  private parsePromoExpiresAt(raw: string): Date {
+    const trimmed = raw.trim();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+    if (!match) throw new Error("INVALID_EXPIRES");
+    const expiresAt = new Date(
+      Number(match[1]),
+      Number(match[2]) - 1,
+      Number(match[3]),
+      23,
+      59,
+      59,
+      999,
+    );
+    if (Number.isNaN(expiresAt.getTime())) throw new Error("INVALID_EXPIRES");
+    if (expiresAt.getTime() <= Date.now()) throw new Error("INVALID_EXPIRES");
+    return expiresAt;
+  }
+
+  private isPromoExpired(expiresAt: Date | null | undefined): boolean {
+    if (!expiresAt) return false;
+    return new Date(expiresAt).getTime() < Date.now();
+  }
+
+  async createPromoCode(
+    adminId: number,
+    coins: number,
+    rawCode?: string,
+    expiresAtRaw?: string,
+  ): Promise<{
+    id: number;
+    code: string;
+    coins: number;
+    createdAt: Date;
+    expiresAt: Date;
+  }> {
+    if (!Number.isFinite(coins) || coins <= 0 || coins > 1_000_000) {
+      throw new Error("INVALID_COINS");
+    }
+    if (!expiresAtRaw?.trim()) throw new Error("INVALID_EXPIRES");
+    const expiresAt = this.parsePromoExpiresAt(expiresAtRaw);
+    const code = rawCode
+      ? this.normalizePromoCode(rawCode)
+      : this.generatePromoCodeValue();
+    if (code.length < 4 || code.length > 32 || !/^[A-Z0-9_-]+$/.test(code)) {
+      throw new Error("INVALID_CODE");
+    }
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const row = await this.promoCodeRepository.create({
+          code,
+          coins: Math.floor(coins),
+          createdByAdminId: adminId,
+          expiresAt,
+        } as any);
+        return {
+          id: row.id,
+          code: row.code,
+          coins: row.coins,
+          createdAt: row.createdAt,
+          expiresAt: row.expiresAt!,
+        };
+      } catch (err: any) {
+        if (err?.name === "SequelizeUniqueConstraintError") {
+          if (rawCode) throw new Error("CODE_EXISTS");
+          continue;
+        }
+        throw err;
+      }
+    }
+    throw new Error("CODE_EXISTS");
+  }
+
+  async listPromoCodes(): Promise<
+    Array<{
+      id: number;
+      code: string;
+      coins: number;
+      createdAt: Date;
+      expiresAt: Date | null;
+      uses: number;
+      expired: boolean;
+    }>
+  > {
+    const rows = await this.promoCodeRepository.findAll({
+      order: [["createdAt", "DESC"]],
+      raw: true,
+    });
+    const ids = rows.map((r) => (r as any).id as number);
+    const counts = new Map<number, number>();
+    if (ids.length > 0) {
+      const redemptions = await this.promoCodeRedemptionRepository.findAll({
+        attributes: ["promoCodeId"],
+        where: { promoCodeId: { [Op.in]: ids } },
+        raw: true,
+      });
+      for (const r of redemptions) {
+        const pid = (r as any).promoCodeId as number;
+        counts.set(pid, (counts.get(pid) ?? 0) + 1);
+      }
+    }
+    return rows.map((r) => {
+      const row = r as any;
+      return {
+        id: row.id,
+        code: row.code,
+        coins: row.coins,
+        createdAt: row.createdAt,
+        expiresAt: row.expiresAt ?? null,
+        uses: counts.get(row.id) ?? 0,
+        expired: this.isPromoExpired(row.expiresAt),
+      };
+    });
+  }
+
+  async redeemPromoCode(
+    userId: number,
+    rawCode: string,
+  ): Promise<{ coins: number; reward: number; code: string }> {
+    const code = this.normalizePromoCode(rawCode);
+    if (!code) throw new Error("PROMO_INVALID");
+
+    const sequelize = this.userRepository.sequelize;
+    if (!sequelize) throw new Error("PROMO_INVALID");
+
+    return sequelize.transaction(async (transaction) => {
+      const promo = await this.promoCodeRepository.findOne({
+        where: { code },
+        transaction,
+      });
+      if (!promo) throw new Error("PROMO_NOT_FOUND");
+      if (this.isPromoExpired(promo.expiresAt)) throw new Error("PROMO_EXPIRED");
+
+      const existing = await this.promoCodeRedemptionRepository.findOne({
+        where: { promoCodeId: promo.id, userId },
+        transaction,
+      });
+      if (existing) throw new Error("PROMO_ALREADY_USED");
+
+      const user = await this.userRepository.findByPk(userId, { transaction });
+      if (!user) throw new Error("PROMO_INVALID");
+
+      try {
+        await this.promoCodeRedemptionRepository.create(
+          { promoCodeId: promo.id, userId } as any,
+          { transaction },
+        );
+      } catch (err: any) {
+        if (err?.name === "SequelizeUniqueConstraintError") {
+          throw new Error("PROMO_ALREADY_USED");
+        }
+        throw err;
+      }
+
+      const reward = promo.coins;
+      const newCoins = user.coins + reward;
+      await user.update({ coins: newCoins }, { transaction });
+      return { coins: newCoins, reward, code: promo.code };
+    }).then(async (result) => {
+      await this.writeUserLog(
+        userId,
+        "promo_redeem",
+        `Промокод ${result.code}: +${result.reward} монет`,
+        { code: result.code, reward: result.reward, coins: result.coins },
+      );
+      return result;
+    });
   }
 }

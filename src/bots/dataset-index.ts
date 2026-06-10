@@ -128,7 +128,9 @@ function manifestPath(dbPath: string): string {
   return path.join(path.dirname(dbPath), "manifest.json");
 }
 
-function readManifest(dbPath: string): Record<string, { size: number; mtime: number }> {
+function readManifest(
+  dbPath: string,
+): Record<string, { size: number; mtime: number }> {
   const p = manifestPath(dbPath);
   if (!fs.existsSync(p)) return {};
   try {
@@ -198,7 +200,9 @@ function createSchema(db: SqliteDatabase): void {
 }
 
 function finalizeFts(db: SqliteDatabase): void {
-  db.exec(`INSERT INTO pairs_fts(rowid, user, reply) SELECT id, user, reply FROM pairs`);
+  db.exec(
+    `INSERT INTO pairs_fts(rowid, user, reply) SELECT id, user, reply FROM pairs`,
+  );
 }
 
 async function ingestJsonl(
@@ -284,7 +288,13 @@ export async function buildDatasetIndex(
 
   for (const file of files) {
     if (file.endsWith(".jsonl")) {
-      const r = await ingestJsonl(file, db, insert, onlyRelevant, options.onProgress);
+      const r = await ingestJsonl(
+        file,
+        db,
+        insert,
+        onlyRelevant,
+        options.onProgress,
+      );
       totalScanned += r.scanned;
       totalInserted += r.inserted;
     }
@@ -355,7 +365,8 @@ export class DatasetIndex {
     }
 
     if (row.intent === scenario) score += 10;
-    else if (row.intent === "small_talk" && scenario !== "small_talk") score += 1;
+    else if (row.intent === "small_talk" && scenario !== "small_talk")
+      score += 1;
     else if (row.intent !== scenario) score -= 4;
 
     if (userL === msg) score += 24;
@@ -376,12 +387,19 @@ export class DatasetIndex {
       score += scoreReplyGenderFit(row.reply, options.botGender);
     }
 
-    if (scenario === "sharing_personal_story" && options.storyKeywords?.length) {
+    if (
+      scenario === "sharing_personal_story" &&
+      options.storyKeywords?.length
+    ) {
       for (const kw of options.storyKeywords) {
         if (replyL.includes(kw)) score += 5;
         if (userL.includes(kw)) score += 3;
       }
-      if (/рассказ|слуша|ого|жесть|интерес|понят|жалко|круто|страш|продолж|дальше/i.test(replyL)) {
+      if (
+        /рассказ|слуша|ого|жесть|интерес|понят|жалко|круто|страш|продолж|дальше/i.test(
+          replyL,
+        )
+      ) {
         score += 6;
       }
     }
@@ -398,7 +416,8 @@ export class DatasetIndex {
       if (row.reply.length > 50) score -= 25;
       if (row.user.length > 35) score -= 15;
       if (row.reply.length <= 20) score += 8;
-      if (/^(прив|привет|хай|йо|здаров|салют|хей|ку)/i.test(replyL)) score += 12;
+      if (/^(прив|привет|хай|йо|здаров|салют|хей|ку)/i.test(replyL))
+        score += 12;
     }
 
     if (scenario === "about_self") {
@@ -410,7 +429,8 @@ export class DatasetIndex {
 
     if (scenario === "how_are_you" || scenario === "checking_in") {
       if (row.reply.length > 60) score -= 12;
-      if (/норм|нормально|ок|неплох|так\s+себе|ты\s+как|тут/i.test(replyL)) score += 10;
+      if (/норм|нормально|ок|неплох|так\s+себе|ты\s+как|тут/i.test(replyL))
+        score += 10;
     }
 
     if (
@@ -511,7 +531,13 @@ export class DatasetIndex {
     const shortGreeting = isShortGreeting(msg);
     const longReply = LONG_REPLY_INTENTS.has(scenario as ChatIntent);
     const isQuestion = scenario === "general_question";
-    const maxUserLen = shortGreeting ? 25 : longReply ? 100 : isQuestion ? 90 : 80;
+    const maxUserLen = shortGreeting
+      ? 25
+      : longReply
+        ? 100
+        : isQuestion
+          ? 90
+          : 80;
     const maxReplyLen = shortGreeting
       ? 40
       : longReply
@@ -564,13 +590,12 @@ export class DatasetIndex {
       return [];
     }
 
-    return [...candidates.values()].sort((a, b) => b.score - a.score).slice(0, 24);
+    return [...candidates.values()]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 24);
   }
 
-  pickWeightedReply(
-    ranked: RankedPair[],
-    botGender?: BotSpeechGender,
-  ): string {
+  pickWeightedReply(ranked: RankedPair[], botGender?: BotSpeechGender): string {
     let top = ranked.slice(0, 12);
     if (botGender) {
       const matched = top.filter((c) => !isOppositeGender(c.reply, botGender));
@@ -579,7 +604,9 @@ export class DatasetIndex {
     top = top.slice(0, 8);
     if (top.length === 0) return "";
     if (top.length === 1) return top[0].reply;
-    const weights = top.map((c, i) => Math.max(1, c.score + (top.length - i) * 2));
+    const weights = top.map((c, i) =>
+      Math.max(1, c.score + (top.length - i) * 2),
+    );
     const sum = weights.reduce((a, b) => a + b, 0);
     let roll = Math.random() * sum;
     for (let i = 0; i < top.length; i++) {

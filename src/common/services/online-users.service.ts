@@ -93,17 +93,16 @@ export class OnlineUsersService {
   }
 
   private emitAfk(user: OnlineUser, afk: boolean) {
-    if (!this.io || !user.roomId || this.isAdminHidden(user, user.roomId)) return;
+    if (!this.io || !user.roomId || this.isAdminHidden(user, user.roomId))
+      return;
     const payload = { socketId: user.socketId, afk };
     this.io.to(`room:${user.roomId}`).emit("user:afk", payload);
   }
 
   async add(socketId: string, user: OnlineUser): Promise<void> {
-    
     const lock = this.userLocks.get(user.id);
     if (lock) await lock;
 
-    
     const lockPromise = (async () => {
       const existing = Array.from(this.users.entries()).find(
         ([, u]) => u.id === user.id && !u.isBot,
@@ -159,7 +158,8 @@ export class OnlineUsersService {
   }
 
   countRoomOnline(roomId: number): number {
-    return this.getByRoom(roomId).filter((u) => this.countsInRoomOnline(u)).length;
+    return this.getByRoom(roomId).filter((u) => this.countsInRoomOnline(u))
+      .length;
   }
 
   getAll(): OnlineUser[] {

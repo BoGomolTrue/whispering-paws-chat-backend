@@ -185,8 +185,7 @@ export class AdminController {
         nickname: bot.nickname,
       });
       const rooms = await this.dbService.getRooms();
-      const roomName =
-        rooms.find((r) => r.id === bot.roomId)?.name ?? "?";
+      const roomName = rooms.find((r) => r.id === bot.roomId)?.name ?? "?";
       return { ok: true, bot: mapBotDto(bot, roomName) };
     } catch {
       throw new BadRequestException("Invalid bot data");
@@ -500,7 +499,8 @@ export class AdminController {
     const user = await this.dbService.getUserById(id);
     if (!user) throw new NotFoundException();
     const ownedItems = await this.dbService.adminGrantItem(id, itemId);
-    if (!ownedItems) throw new BadRequestException("Invalid item or already owned");
+    if (!ownedItems)
+      throw new BadRequestException("Invalid item or already owned");
     this.syncOnlineItems(id, ownedItems);
     await this.audit(
       admin,
@@ -555,7 +555,8 @@ export class AdminController {
     @Body() body: { role?: string },
   ) {
     const admin = await this.requireAdmin(req);
-    if (id === admin.id) throw new BadRequestException("Cannot change own role");
+    if (id === admin.id)
+      throw new BadRequestException("Cannot change own role");
     const role = body.role?.trim();
     if (role !== "user" && role !== "admin") {
       throw new BadRequestException("Invalid role");
@@ -577,7 +578,10 @@ export class AdminController {
   }
 
   @Post("users/:id/reset-salary")
-  async resetSalary(@Req() req: Request, @Param("id", ParseIntPipe) id: number) {
+  async resetSalary(
+    @Req() req: Request,
+    @Param("id", ParseIntPipe) id: number,
+  ) {
     const admin = await this.requireAdmin(req);
     const user = await this.dbService.getUserById(id);
     if (!user) throw new NotFoundException();
@@ -610,7 +614,10 @@ export class AdminController {
   }
 
   @Post("users/:id/reset-streak")
-  async resetStreak(@Req() req: Request, @Param("id", ParseIntPipe) id: number) {
+  async resetStreak(
+    @Req() req: Request,
+    @Param("id", ParseIntPipe) id: number,
+  ) {
     const admin = await this.requireAdmin(req);
     const user = await this.dbService.getUserById(id);
     if (!user) throw new NotFoundException();
@@ -643,5 +650,44 @@ export class AdminController {
       { userId: id, message: "Сброшен стартовый квест" },
     );
     return { ok: true };
+  }
+
+  @Get("promo-codes")
+  async listPromoCodes(@Req() req: Request) {
+    await this.requireAdmin(req);
+    const items = await this.dbService.listPromoCodes();
+    return { items };
+  }
+
+  @Post("promo-codes")
+  async createPromoCode(
+    @Req() req: Request,
+    @Body() body: { coins?: number; code?: string; expiresAt?: string },
+  ) {
+    const admin = await this.requireAdmin(req);
+    const coins = body.coins;
+    if (coins == null || coins <= 0) throw new BadRequestException("Invalid coins");
+    if (!body.expiresAt?.trim()) throw new BadRequestException("Invalid expires date");
+    try {
+      const item = await this.dbService.createPromoCode(
+        admin.id,
+        coins,
+        body.code,
+        body.expiresAt,
+      );
+      await this.audit(admin, "promo_create", null, {
+        code: item.code,
+        coins: item.coins,
+        expiresAt: item.expiresAt,
+      });
+      return { ok: true, item };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Invalid promo code";
+      if (msg === "INVALID_COINS") throw new BadRequestException("Invalid coins");
+      if (msg === "INVALID_CODE") throw new BadRequestException("Invalid code");
+      if (msg === "INVALID_EXPIRES") throw new BadRequestException("Invalid expires date");
+      if (msg === "CODE_EXISTS") throw new BadRequestException("Code already exists");
+      throw new BadRequestException(msg);
+    }
   }
 }
