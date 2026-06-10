@@ -11,6 +11,7 @@ import {
 } from "@nestjs/common";
 import { Request } from "express";
 import { AuthService } from "../auth/auth.service";
+import { getAuthTokenFromRequest } from "../common/utils/auth-token.util";
 import { DatabaseService } from "../database/database.service";
 import { FilesService } from "../files/files.service";
 
@@ -25,9 +26,7 @@ export class SupportController {
   ) {}
 
   private async requireUser(req: Request) {
-    const token =
-      (req.cookies?.token as string) ||
-      req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    const token = getAuthTokenFromRequest(req);
     if (!token) throw new UnauthorizedException();
     const payload = this.authService.verifyToken(token);
     if (!payload?.userId) throw new UnauthorizedException();

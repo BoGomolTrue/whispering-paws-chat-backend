@@ -13,6 +13,7 @@ import {
 import { Request } from "express";
 import { AuthService } from "../auth/auth.service";
 import { OnlineUsersService } from "../common/services/online-users.service";
+import { getAuthTokenFromRequest } from "../common/utils/auth-token.util";
 import { DatabaseService } from "../database/database.service";
 import { ShopService } from "./shop.service";
 
@@ -26,9 +27,7 @@ export class ShopController {
   ) {}
 
   private async requireUser(req: Request) {
-    const token =
-      (req.cookies?.token as string) ||
-      req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    const token = getAuthTokenFromRequest(req);
     if (!token) throw new UnauthorizedException();
     const payload = this.authService.verifyToken(token);
     if (!payload?.userId) throw new UnauthorizedException();

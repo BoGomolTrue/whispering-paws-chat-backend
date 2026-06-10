@@ -15,6 +15,7 @@ import * as crypto from "crypto";
 import { Request, Response } from "express";
 import { DatabaseService } from "../database/database.service";
 import { getClientIp } from "../common/utils/client-ip.util";
+import { getAuthTokenFromRequest } from "../common/utils/auth-token.util";
 import { AuthService } from "./auth.service";
 import { GuestLoginDto, LoginDto, RegisterDto } from "./dto/login.dto";
 
@@ -39,13 +40,7 @@ export class AuthController {
 
   @Get("me")
   async me(@Req() req: Request, @Res() res: Response) {
-    const authHeader = req.headers.authorization;
-    let token: string | undefined;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.substring(7);
-    } else {
-      token = req.cookies?.token;
-    }
+    const token = getAuthTokenFromRequest(req);
     if (!token) {
       return res.status(401).json({ user: null });
     }

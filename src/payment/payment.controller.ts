@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import { AuthService } from "../auth/auth.service";
+import { getAuthTokenFromRequest } from "../common/utils/auth-token.util";
 import { DatabaseService } from "../database/database.service";
 import { PaymentService } from "./payment.service";
 
@@ -61,9 +62,7 @@ export class PaymentController {
     @Body() body: { telegramId?: string; chargeId?: string; coins?: number },
     @Res() res: Response,
   ) {
-    const token =
-      (req.cookies?.token as string) ||
-      (req.headers.authorization?.replace(/^Bearer\s+/i, "") as string);
+    const token = getAuthTokenFromRequest(req);
     if (!token) {
       throw new UnauthorizedException("Unauthorized");
     }

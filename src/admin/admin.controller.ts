@@ -21,6 +21,7 @@ import { BotProfileInput } from "../bots/bot-profile.util";
 import { BotsService } from "../bots/bots.service";
 import { Bot } from "../database/models/bot.model";
 import { OnlineUsersService } from "../common/services/online-users.service";
+import { getAuthTokenFromRequest } from "../common/utils/auth-token.util";
 import { DatabaseService } from "../database/database.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { getShopItemById } from "../shop/shop.data.constant";
@@ -67,9 +68,7 @@ export class AdminController {
   ) {}
 
   private async requireAdmin(req: Request): Promise<AdminActor> {
-    const token =
-      (req.cookies?.token as string) ||
-      req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    const token = getAuthTokenFromRequest(req);
     if (!token) throw new UnauthorizedException();
     const payload = this.authService.verifyToken(token);
     if (!payload?.userId) throw new UnauthorizedException();
