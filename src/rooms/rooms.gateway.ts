@@ -279,28 +279,7 @@ export class RoomsGateway
     if (user && user.roomId) {
       if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
         const leaveMessage = pickSystemMessage(LEAVE_SYSTEM_MESSAGES);
-        void this.dbService
-          .saveChatMessage({
-            roomId: user.roomId,
-            userId: null,
-            nickname: user.nickname,
-            text: leaveMessage,
-            gender: user.gender,
-            isSystem: true,
-          })
-          .then(() => {
-            this.server.to(`room:${user.roomId}`).emit("chat:message", {
-              msgId: Date.now(),
-              socketId: "__system__",
-              nickname: user.nickname,
-              text: leaveMessage,
-              timestamp: Date.now(),
-              gender: user.gender,
-            });
-          });
-      }
-
-      if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
+        void this.emitRoomSystemChat(user.roomId, user, leaveMessage);
         client.to(`room:${user.roomId}`).emit("user:leave", client.id);
       }
       if (!user.isGuest) {
@@ -703,47 +682,10 @@ export class RoomsGateway
     if (user.roomId) {
       if (next) {
         const leaveMessage = pickSystemMessage(LEAVE_SYSTEM_MESSAGES);
-        void this.dbService
-          .saveChatMessage({
-            roomId: user.roomId,
-            userId: null,
-            nickname: user.nickname,
-            text: leaveMessage,
-            gender: user.gender,
-            isSystem: true,
-          })
-          .then(() => {
-            this.server.to(`room:${user.roomId}`).emit("chat:message", {
-              msgId: Date.now(),
-              socketId: "__system__",
-              nickname: user.nickname,
-              text: leaveMessage,
-              timestamp: Date.now(),
-              gender: user.gender,
-            });
-          });
+        void this.emitRoomSystemChat(user.roomId, user, leaveMessage);
       } else {
         const joinMessage = pickSystemMessage(JOIN_SYSTEM_MESSAGES);
-
-        void this.dbService
-          .saveChatMessage({
-            roomId: user.roomId,
-            userId: null,
-            nickname: user.nickname,
-            text: joinMessage,
-            gender: user.gender,
-            isSystem: true,
-          })
-          .then(() => {
-            this.server.to(`room:${user.roomId}`).emit("chat:message", {
-              msgId: Date.now(),
-              socketId: "__system__",
-              nickname: user.nickname,
-              text: joinMessage,
-              timestamp: Date.now(),
-              gender: user.gender,
-            });
-          });
+        void this.emitRoomSystemChat(user.roomId, user, joinMessage);
       }
       client.to(`room:${user.roomId}`).emit("user:leave", client.id);
       if (!this.onlineUsersService.isAdminHidden(user, user.roomId)) {
@@ -819,6 +761,29 @@ export class RoomsGateway
     });
   }
 
+  private async emitRoomSystemChat(
+    roomId: number,
+    user: { nickname: string; gender: string | null },
+    text: string,
+  ): Promise<void> {
+    await this.dbService.saveChatMessage({
+      roomId,
+      userId: null,
+      nickname: user.nickname,
+      text,
+      gender: user.gender,
+      isSystem: true,
+    });
+    this.server.to(`room:${roomId}`).emit("chat:message", {
+      msgId: Date.now(),
+      socketId: "__system__",
+      nickname: user.nickname,
+      text,
+      timestamp: Date.now(),
+      gender: user.gender,
+    });
+  }
+
   private async joinRoom(client: Socket, user: any, roomId: number) {
     const targetRoom = await this.dbService.getRoomById(roomId);
     if (!targetRoom) return;
@@ -850,7 +815,12 @@ export class RoomsGateway
     const prevRoomId = user.roomId;
     if (prevRoomId) {
       void client.leave(`room:${prevRoomId}`);
-      if (!this.onlineUsersService.isAdminHidden(user, prevRoomId)) {
+      if (
+        prevRoomId !== roomId &&
+        !this.onlineUsersService.isAdminHidden(user, prevRoomId)
+      ) {
+        const leaveMessage = pickSystemMessage(LEAVE_SYSTEM_MESSAGES);
+        void this.emitRoomSystemChat(prevRoomId, user, leaveMessage);
         void client.to(`room:${prevRoomId}`).emit("user:leave", client.id);
       }
     }
@@ -934,23 +904,7 @@ export class RoomsGateway
 
     if (!this.onlineUsersService.isAdminHidden(user, roomId)) {
       const joinMessage = pickSystemMessage(JOIN_SYSTEM_MESSAGES);
-      await this.dbService.saveChatMessage({
-        roomId,
-        userId: null,
-        nickname: user.nickname,
-        text: joinMessage,
-        gender: user.gender,
-        isSystem: true,
-      });
-
-      this.server.to(`room:${roomId}`).emit("chat:message", {
-        msgId: Date.now(),
-        socketId: "__system__",
-        nickname: user.nickname,
-        text: joinMessage,
-        timestamp: Date.now(),
-        gender: user.gender,
-      });
+      await this.emitRoomSystemChat(roomId, user, joinMessage);
     }
 
     if (!this.onlineUsersService.isAdminHidden(user, roomId)) {

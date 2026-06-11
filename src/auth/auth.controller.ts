@@ -371,4 +371,86 @@ export class AuthController {
       },
     });
   }
+
+  @Post("yandex")
+  @HttpCode(HttpStatus.OK)
+  async yandex(
+    @Body() body: { uniqueId?: string; name?: string; signature?: string },
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const secret = this.configService.get<string>("YANDEX_SECRET") || "";
+    let yandexId = body.uniqueId?.trim() ?? "";
+
+    if (body.signature) {
+      if (!secret) {
+        throw new BadRequestException("Yandex auth not configured");
+      }
+      const verified = this.authService.verifyYandexPlayerSignature(
+        body.signature,
+      );
+      if (!verified) {
+        throw new BadRequestException("Invalid Yandex signature");
+      }
+      yandexId = verified;
+    } else if (secret) {
+      throw new BadRequestException("Missing Yandex signature");
+    }
+
+    if (!yandexId) {
+      throw new BadRequestException("Missing Yandex player id");
+    }
+
+    let user = await this.dbService.findUserByYandexId(yandexId);
+    let isNew = false;
+    if (!user) {
+      isNew = true;
+      const rawName = body.name?.trim().slice(0, 20) ?? "";
+      let nickname =
+        rawName.length >= 2 && rawName.length <= 20 ? rawName : "";
+      if (!nickname) {
+        nickname = `user_${crypto.randomBytes(3).toString("hex")}`;
+      }
+      while (await this.dbService.findUserByNickname(nickname)) {
+        nickname = `user_${crypto.randomBytes(3).toString("hex")}`;
+      }
+      const fakeEmail = `ya_${yandexId.slice(0, 48)}@wp.local`;
+      const fakePassword = await bcrypt.hash(
+        crypto.randomBytes(32).toString("hex"),
+        10,
+      );
+      const registrationIp = getClientIp(req);
+      user = await this.dbService.createUser({
+        email: fakeEmail,
+        password: fakePassword,
+        nickname,
+        characterType: "cat",
+        gender: "male",
+        yandexId,
+        registrationIp,
+      });
+      await this.dbService.addOwnedItem(user.id, "sparkle");
+    }
+    const plain = user.get({ plain: true }) as {
+      banned: boolean;
+      id: number;
+      nickname: string;
+      characterType: string;
+    };
+    if (plain.banned) {
+      throw new BadRequestException("BANNED");
+    }
+    const token = this.authService.signToken(plain.id);
+    setTokenCookie(res, token);
+    return res.json({
+      ok: true,
+      token,
+      isNew,
+      user: {
+        id: plain.id,
+        nickname: plain.nickname,
+        characterType: plain.characterType,
+      },
+    });
+  }
 }

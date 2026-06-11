@@ -194,10 +194,17 @@ export class UsersGateway {
     @MessageBody() data: { userId?: number },
   ) {
     const viewer = this.onlineUsersService.get(client.id);
-    if (!viewer || viewer.isGuest) {
-      client.emit("profile:error", "Guests cannot view profiles");
+    if (!viewer) return;
+
+    if (viewer.isGuest) {
+      if (!data?.userId) {
+        client.emit("profile:error", "Guests cannot open profile");
+        return;
+      }
+      await this.emitProfileView(client, null, data.userId);
       return;
     }
+
     const targetUserId = data?.userId ?? viewer.id;
     await this.emitProfileView(client, viewer.id, targetUserId);
   }
@@ -356,12 +363,13 @@ export class UsersGateway {
 
   private async emitProfileView(
     client: Socket,
-    viewerId: number,
+    viewerId: number | null,
     targetUserId: number,
   ) {
     const target = await this.dbService.getUserById(targetUserId);
     const online = this.onlineUsersService.getById(targetUserId);
     const isGuestTarget = target?.isGuest === true || online?.isGuest === true;
+    const ranks = await this.dbService.getRanks();
 
     if (!target && !online) {
       client.emit("profile:error", "User not found");
@@ -375,7 +383,8 @@ export class UsersGateway {
         posts: [],
         rooms: [],
         isFriend: false,
-        isOwn: targetUserId === viewerId,
+        isOwn: viewerId === targetUserId,
+        ranks,
       });
       return;
     }
@@ -389,7 +398,7 @@ export class UsersGateway {
     const posts = await this.dbService.listProfilePosts(targetUserId);
     const rooms = await this.dbService.listUserCreatedRooms(targetUserId);
     const isFriend =
-      viewerId !== targetUserId
+      viewerId != null && viewerId !== targetUserId
         ? await this.dbService.isUserFriend(viewerId, targetUserId)
         : false;
     client.emit("profile:viewData", {
@@ -398,7 +407,8 @@ export class UsersGateway {
       posts,
       rooms,
       isFriend,
-      isOwn: targetUserId === viewerId,
+      isOwn: viewerId === targetUserId,
+      ranks,
     });
   }
 

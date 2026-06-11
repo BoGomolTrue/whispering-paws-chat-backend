@@ -118,6 +118,11 @@ export class User extends Model<User> {
   @Column(DataType.STRING)
   telegramId: string | null;
 
+  @Default(null)
+  @Unique
+  @Column(DataType.STRING(64))
+  yandexId: string | null;
+
   @Default(false)
   @AllowNull(false)
   @Column(DataType.BOOLEAN)

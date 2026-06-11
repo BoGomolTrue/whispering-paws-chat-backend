@@ -60,6 +60,7 @@ export interface DbUserRow {
   animationsOff?: boolean;
   vkId?: number;
   telegramId?: string;
+  yandexId?: string;
   password?: string;
   isGuest?: boolean;
   anketa_about?: string | null;
@@ -269,6 +270,10 @@ export class DatabaseService implements OnModuleInit {
     return this.userRepository.findOne({ where: { telegramId } });
   }
 
+  async findUserByYandexId(yandexId: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { yandexId } });
+  }
+
   async createUser(data: {
     email: string;
     password: string;
@@ -277,6 +282,7 @@ export class DatabaseService implements OnModuleInit {
     gender?: string;
     vkId?: number;
     telegramId?: string;
+    yandexId?: string;
     registrationIp?: string | null;
   }): Promise<User> {
     const startingCoins = await this.getSettingNumber("starting_coins", 100);
@@ -290,6 +296,7 @@ export class DatabaseService implements OnModuleInit {
       coins: startingCoins,
       vkId: data.vkId ?? null,
       telegramId: data.telegramId ?? null,
+      yandexId: data.yandexId ?? null,
       registrationIp: data.registrationIp ?? null,
       referralCode,
     } as any);

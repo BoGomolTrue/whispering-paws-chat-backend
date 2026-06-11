@@ -43,6 +43,8 @@ async function bootstrap() {
     "https://vk.com",
     "https://*.vk.com",
     "https://whispering-paws.ru",
+    "https://games.yandex.ru",
+    "https://yandex.ru",
   ];
 
   app.enableCors({
@@ -53,6 +55,9 @@ async function bootstrap() {
         origin.startsWith("http://127.0.0.1")
       )
         return callback(null, origin);
+      if (/^https:\/\/([a-z0-9-]+\.)*yandex\.(ru|com)(:\d+)?$/i.test(origin)) {
+        return callback(null, origin);
+      }
       const allowed = allowedOrigins.some((o: string) =>
         origin.startsWith(o.replace("*", "")),
       );
