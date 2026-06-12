@@ -13,9 +13,9 @@ import { ConfigService } from "@nestjs/config";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import { Request, Response } from "express";
-import { DatabaseService } from "../database/database.service";
-import { getClientIp } from "../common/utils/client-ip.util";
 import { getAuthTokenFromRequest } from "../common/utils/auth-token.util";
+import { getClientIp } from "../common/utils/client-ip.util";
+import { DatabaseService } from "../database/database.service";
 import { AuthService } from "./auth.service";
 import { GuestLoginDto, LoginDto, RegisterDto } from "./dto/login.dto";
 
@@ -382,10 +382,7 @@ export class AuthController {
     const secret = this.configService.get<string>("YANDEX_SECRET") || "";
     let yandexId = body.uniqueId?.trim() ?? "";
 
-    if (body.signature) {
-      if (!secret) {
-        throw new BadRequestException("Yandex auth not configured");
-      }
+    if (body.signature && secret) {
       const verified = this.authService.verifyYandexPlayerSignature(
         body.signature,
       );
@@ -406,8 +403,7 @@ export class AuthController {
     if (!user) {
       isNew = true;
       const rawName = body.name?.trim().slice(0, 20) ?? "";
-      let nickname =
-        rawName.length >= 2 && rawName.length <= 20 ? rawName : "";
+      let nickname = rawName.length >= 2 && rawName.length <= 20 ? rawName : "";
       if (!nickname) {
         nickname = `user_${crypto.randomBytes(3).toString("hex")}`;
       }
