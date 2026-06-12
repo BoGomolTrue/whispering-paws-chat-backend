@@ -402,11 +402,7 @@ export class AuthController {
     let isNew = false;
     if (!user) {
       isNew = true;
-      const rawName = body.name?.trim().slice(0, 20) ?? "";
-      let nickname = rawName.length >= 2 && rawName.length <= 20 ? rawName : "";
-      if (!nickname) {
-        nickname = `user_${crypto.randomBytes(3).toString("hex")}`;
-      }
+      let nickname = `user_${crypto.randomBytes(3).toString("hex")}`;
       while (await this.dbService.findUserByNickname(nickname)) {
         nickname = `user_${crypto.randomBytes(3).toString("hex")}`;
       }
