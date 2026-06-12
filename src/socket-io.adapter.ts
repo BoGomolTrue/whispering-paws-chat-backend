@@ -23,7 +23,9 @@ export class SocketIoAdapter extends IoAdapter {
           const allowed =
             origin.startsWith("http://localhost") ||
             origin.startsWith("http://127.0.0.1") ||
-            SOCKET_CORS_ORIGINS.includes(origin);
+            SOCKET_CORS_ORIGINS.includes(origin) ||
+            /^https:\/\/([a-z0-9-]+\.)*yandex\.(ru|com|net)(:\d+)?$/i.test(origin) ||
+            /^https:\/\/[a-z0-9-]+\.games\.s3\.yandex\.net$/i.test(origin);
           callback(null, allowed ? origin : false);
         },
         credentials: true,
