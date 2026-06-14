@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
+import { AuthService } from "../auth/auth.service";
 import { OnlineUsersService } from "../common/services/online-users.service";
 import { DatabaseService } from "../database/database.service";
 import { COIN_PACKAGES, CoinPackage } from "./constants/coin-packages.constant";
@@ -11,6 +12,7 @@ export class PaymentService {
 
   constructor(
     private configService: ConfigService,
+    private authService: AuthService,
     private dbService: DatabaseService,
     private onlineUsersService: OnlineUsersService,
   ) {}
@@ -313,6 +315,121 @@ export class PaymentService {
 
       this.logger.log(`TG Stars: +${pkg.coins} coins → ${user.nickname}`);
     }
+  }
+
+  async processYandexPurchase(
+    signature: string,
+    userId: number,
+  ): Promise<{
+    purchaseTokens: string[];
+    coins: number;
+    error?: string;
+  }> {
+    const parsed = this.authService.verifyYandexSignedMessage(signature, "payments");
+    if (!parsed) {
+      return { purchaseTokens: [], coins: 0, error: "Invalid signature" };
+    }
+
+    const user = await this.dbService.getUserById(userId);
+    if (!user) {
+      return { purchaseTokens: [], coins: 0, error: "User not found" };
+    }
+
+    const items = this.extractYandexPurchaseItems(parsed);
+    if (items.length === 0) {
+      return { purchaseTokens: [], coins: user.coins, error: "No purchases" };
+    }
+
+    let coins = user.coins;
+    const purchaseTokens: string[] = [];
+
+    for (const item of items) {
+      const token = item.token;
+      const productId = item.product?.id;
+      if (!token || !productId) continue;
+
+      purchaseTokens.push(token);
+
+      if (item.errorCode) continue;
+
+      if (await this.dbService.isYandexPurchaseTokenUsed(token)) {
+        continue;
+      }
+
+      const pkg = this.getCoinPackageById(productId);
+      if (!pkg) {
+        this.logger.warn(`Yandex Pay: unknown product ${productId}`);
+        continue;
+      }
+
+      if (item.developerPayload) {
+        try {
+          const payload = JSON.parse(item.developerPayload) as { userId?: number };
+          if (payload.userId != null && payload.userId !== userId) {
+            this.logger.warn(`Yandex Pay: user mismatch for token ${token}`);
+            continue;
+          }
+        } catch {}
+      }
+
+      coins += pkg.coins;
+      await this.dbService.updateUserCoins(userId, coins);
+      await this.dbService.recordYandexPurchaseToken(token, userId, productId);
+
+      if (user.referredBy && !user.referralBonusPaid) {
+        const bonus = Math.floor(pkg.coins * 0.1);
+        const referrer = await this.dbService.findUserById(user.referredBy);
+        if (referrer) {
+          const referrerNewCoins = referrer.coins + bonus;
+          await this.dbService.updateUserCoins(referrer.id, referrerNewCoins);
+          this.onlineUsersService.updateCoins(referrer.id, referrerNewCoins);
+          this.logger.log(
+            `Yandex Pay referral bonus: +${bonus} coins → ${referrer.nickname}`,
+          );
+        }
+        const userRecord = await this.dbService.findUserById(userId);
+        if (userRecord) {
+          await userRecord.update({ referralBonusPaid: true });
+        }
+      }
+
+      this.logger.log(`Yandex Pay: +${pkg.coins} coins → ${user.nickname}`);
+    }
+
+    if (coins !== user.coins) {
+      this.onlineUsersService.updateCoins(userId, coins);
+    }
+
+    return { purchaseTokens, coins };
+  }
+
+  private extractYandexPurchaseItems(
+    parsed: Record<string, unknown>,
+  ): Array<{
+    token?: string;
+    errorCode?: string;
+    developerPayload?: string;
+    product?: { id?: string };
+  }> {
+    const data = parsed.data;
+    if (Array.isArray(data)) {
+      return data as Array<{
+        token?: string;
+        errorCode?: string;
+        developerPayload?: string;
+        product?: { id?: string };
+      }>;
+    }
+    if (data && typeof data === "object") {
+      const row = data as {
+        token?: string;
+        errorCode?: string;
+        developerPayload?: string;
+        product?: { id?: string };
+      };
+      if (row.token) return [row];
+    }
+    return [];
   }
 
   private creditCoinsToOnlineUser(userId: number, coins: number): void {

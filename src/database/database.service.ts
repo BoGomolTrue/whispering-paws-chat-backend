@@ -26,6 +26,7 @@ import { ProfilePostComment } from "./models/profile-post-comment.model";
 import { SupportMessage } from "./models/support-message.model";
 import { PromoCode } from "./models/promo-code.model";
 import { PromoCodeRedemption } from "./models/promo-code-redemption.model";
+import { YandexPurchaseToken } from "./models/yandex-purchase-token.model";
 import { ChatMessage } from "./models/chat-message.model";
 import { DirectMessage } from "./models/direct-message.model";
 import { Notification } from "./models/notification.model";
@@ -107,6 +108,8 @@ export class DatabaseService implements OnModuleInit {
     @InjectModel(PromoCode) private promoCodeRepository: typeof PromoCode,
     @InjectModel(PromoCodeRedemption)
     private promoCodeRedemptionRepository: typeof PromoCodeRedemption,
+    @InjectModel(YandexPurchaseToken)
+    private yandexPurchaseTokenRepository: typeof YandexPurchaseToken,
   ) {}
 
   async onModuleInit() {
@@ -1967,5 +1970,22 @@ export class DatabaseService implements OnModuleInit {
       );
       return result;
     });
+  }
+
+  async isYandexPurchaseTokenUsed(token: string): Promise<boolean> {
+    const row = await this.yandexPurchaseTokenRepository.findByPk(token);
+    return !!row;
+  }
+
+  async recordYandexPurchaseToken(
+    token: string,
+    userId: number,
+    productId: string,
+  ): Promise<void> {
+    await this.yandexPurchaseTokenRepository.create({
+      token,
+      userId,
+      productId,
+    } as YandexPurchaseToken);
   }
 }

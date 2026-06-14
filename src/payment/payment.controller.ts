@@ -90,4 +90,41 @@ export class PaymentController {
     }
     return res.status(HttpStatus.OK).json({ ok: true });
   }
+
+  @Post("yandex/confirm")
+  async handleYandexConfirm(
+    @Req() req: Request,
+    @Body() body: { signature?: string },
+    @Res() res: Response,
+  ) {
+    const token = getAuthTokenFromRequest(req);
+    if (!token) {
+      throw new UnauthorizedException("Unauthorized");
+    }
+    const payload = this.authService.verifyToken(token);
+    if (!payload?.userId) {
+      throw new UnauthorizedException("Unauthorized");
+    }
+
+    const signature = body?.signature?.trim();
+    if (!signature) {
+      return res
+        .status(HttpStatus.BAD_REQUEST)
+        .json({ error: "Missing signature" });
+    }
+
+    const result = await this.paymentService.processYandexPurchase(
+      signature,
+      payload.userId,
+    );
+
+    if (result.error && result.purchaseTokens.length === 0) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ error: result.error });
+    }
+
+    return res.status(HttpStatus.OK).json({
+      purchaseTokens: result.purchaseTokens,
+      coins: result.coins,
+    });
+  }
 }

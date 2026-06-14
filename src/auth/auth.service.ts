@@ -52,7 +52,25 @@ export class AuthService {
   }
 
   verifyYandexPlayerSignature(signature: string): string | null {
-    const secret = this.configService.get<string>("YANDEX_SECRET") || "";
+    const parsed = this.verifyYandexSignedMessage(signature, "player");
+    if (!parsed) return null;
+    const payload = (parsed.data as Record<string, unknown> | undefined) ?? parsed;
+    const id =
+      (payload.uniqueID as string | undefined) ??
+      (payload.uniqueId as string | undefined);
+    return id ? String(id) : null;
+  }
+
+  verifyYandexSignedMessage(
+    signature: string,
+    kind: "player" | "payments" = "player",
+  ): Record<string, unknown> | null {
+    const secret =
+      kind === "payments"
+        ? this.configService.get<string>("YANDEX_PAYMENTS_SECRET") ||
+          this.configService.get<string>("YANDEX_SECRET") ||
+          ""
+        : this.configService.get<string>("YANDEX_SECRET") || "";
     if (!secret) return null;
     const dot = signature.indexOf(".");
     if (dot <= 0) return null;
@@ -62,14 +80,7 @@ export class AuthService {
     const hmac = crypto.createHmac("sha256", secret).update(message).digest("base64");
     if (sign !== hmac) return null;
     try {
-      const parsed = JSON.parse(message) as {
-        data?: { uniqueID?: string; uniqueId?: string };
-        uniqueID?: string;
-        uniqueId?: string;
-      };
-      const payload = parsed.data ?? parsed;
-      const id = payload.uniqueID ?? payload.uniqueId;
-      return id ? String(id) : null;
+      return JSON.parse(message) as Record<string, unknown>;
     } catch {
       return null;
     }

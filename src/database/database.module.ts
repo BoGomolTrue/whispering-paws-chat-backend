@@ -21,6 +21,7 @@ import { ProfilePostComment } from "./models/profile-post-comment.model";
 import { SupportMessage } from "./models/support-message.model";
 import { PromoCode } from "./models/promo-code.model";
 import { PromoCodeRedemption } from "./models/promo-code-redemption.model";
+import { YandexPurchaseToken } from "./models/yandex-purchase-token.model";
 
 @Global()
 @Module({
@@ -50,6 +51,7 @@ import { PromoCodeRedemption } from "./models/promo-code-redemption.model";
           SupportMessage,
           PromoCode,
           PromoCodeRedemption,
+          YandexPurchaseToken,
         ],
         autoLoadModels: true,
         synchronize: configService.get("NODE_ENV") !== "production",
@@ -78,6 +80,7 @@ import { PromoCodeRedemption } from "./models/promo-code-redemption.model";
       SupportMessage,
       PromoCode,
       PromoCodeRedemption,
+      YandexPurchaseToken,
     ]),
   ],
   providers: [DatabaseService],
